@@ -2,4 +2,5 @@
 -- Import modules here that should be built as part of the library.
 import Lisa.Basic
 import Lisa.Syntax
-import Lisa.Proof
+import Lisa.Standard
+import Lisa.Weakened
