@@ -1,0 +1,15 @@
+name = "lisa-checker"
+version = "0.1.0"
+defaultTargets = ["lisa-checker"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.29.1"
+
+[[lean_lib]]
+name = "Lisa"
+
+[[lean_exe]]
+name = "lisa-checker"
+root = "Main"
