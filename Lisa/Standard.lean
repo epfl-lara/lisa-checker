@@ -1,7 +1,6 @@
-import Mathlib.Data.Finset.Image
 import Lisa.Syntax
 
-namespace Lisa
+open Lisa
 
 abbrev Order : Type := Expr -> Expr -> Prop
 
@@ -231,5 +230,3 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ProofTree leq (Γ.image (subst σ)) (Δ.image (subst σ))
 
 end Standard
-
-end Lisa
