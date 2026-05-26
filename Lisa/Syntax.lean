@@ -38,6 +38,13 @@ def depth : LSort -> Nat
   | prop => 0
   | arrow _ s => depth s + 1
 
+def splitArgs : LSort -> (List LSort × LSort)
+  | ind => ([], ind)
+  | prop => ([], prop)
+  | arrow arg res =>
+      match splitArgs res with
+      | (args, final) => (arg :: args, final)
+
 end LSort
 
 structure SVar where
@@ -82,13 +89,19 @@ def sort : Expr -> Option LSort
       | some bodySort => some (x.sort >> bodySort)
       | none => none
 
-end Expr
+def wellSorted (e : Expr) : Prop := e.sort.isSome
 
 def hasSort (e : Expr) (s : LSort) : Prop := e.sort = some s
 
-def isFormula (e : Expr) : Prop := hasSort e prop
+def isFunctional (e : Expr) : Prop := e.sort.map LSort.isFunctional = some true
 
-def isTerm (e : Expr) : Prop := hasSort e ind
+def isPredicate (e : Expr) : Prop := e.sort.map LSort.isPredicate = some true
+
+end Expr
+
+def isFormula (e : Expr) : Prop := e.hasSort prop
+
+def isTerm (e : Expr) : Prop := e.hasSort ind
 
 @[simp]
 def isFSet (Γ : Finset Expr) : Prop := ∀ φ ∈ Γ, isFormula φ
@@ -107,7 +120,7 @@ def freeVars (σ : Subst) : Finset SVar :=
   σ.toList.foldl (fun acc (x, e) => acc ∪ {x} ∪ e.freeVars) ∅
 
 def wellSorted (σ : Subst) : Prop :=
-  ∀ x e, σ.find? x = some e -> hasSort e x.sort
+  ∀ x e, σ.find? x = some e -> e.hasSort x.sort
 
 /-- Capture-avoiding simultaneous substitution. -/
 def subst (σ : Subst) : Expr -> Expr
@@ -138,6 +151,9 @@ def named (name : String) (sort : LSort) (idx : Nat := 0) : SConst :=
 end SConst
 
 namespace Expr
+
+def applied (e : Expr) (args : List Expr) : Expr :=
+  args.foldl .app e
 
 def top : Expr := .const (.named "top" prop)
 
