@@ -39,6 +39,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
 
   -- common rules
   | hypothesis (φ : Expr) :
+      isFormula φ ->
       ProofTree leq {φ} {φ}
 
   | cut {Γ Ω Δ Ξ : Finset Expr} (φ : Expr) :

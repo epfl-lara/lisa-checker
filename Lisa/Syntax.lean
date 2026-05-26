@@ -90,6 +90,7 @@ def isFormula (e : Expr) : Prop := hasSort e prop
 
 def isTerm (e : Expr) : Prop := hasSort e ind
 
+@[simp]
 def isFSet (Γ : Finset Expr) : Prop := ∀ φ ∈ Γ, isFormula φ
 
 /-- Given a set of used identifiers and a base identifier, generate a fresh
