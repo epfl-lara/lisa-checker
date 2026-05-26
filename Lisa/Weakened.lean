@@ -393,29 +393,69 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ordContains leq (eq t t) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
 
-  | leftSubstEq {Γ Δ : Finset Expr} (x : SVar) (s t φ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
-      x.sort = ind ->
-      isTerm s ->
-      isTerm t ->
-      isFormula φ ->
-      ProofTree leq (insert (substOne x s φ) Γ) Δ ->
-      ProofTree leq (insert (eq s t) (insert (substOne x t φ) Γ)) Δ
+  | leftSubstEq {Γ₁ Γ₂ Ω₁ Ω₂: Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      (∀ σ ∈ eqs, σ.wellSorted) ->
+      φ.wellSorted ->
+      -- arguments of φ match the sorts of the subst pairs
+      (
+        match φ.sort with
+        | none => False
+        | some sort =>
+            let (args, _) := sort.splitArgs
+            eqs.map (·.sort) = args.map some
+      ) ->
+      (
+        let liftedEqs := eqs.map (·.liftEq) |>.toFinset
+        let φs := φ.applied (eqs.map (·.source))
+        let φt := φ.applied (eqs.map (·.target))
 
-  | rightSubstEq {Γ Δ : Finset Expr} (x : SVar) (s t φ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
-      x.sort = ind ->
-      isTerm s ->
-      isTerm t ->
-      isFormula φ ->
-      ProofTree leq Γ (insert (substOne x s φ) Δ) ->
-      ProofTree leq (insert (eq s t) Γ) (insert (substOne x t φ) Δ)
+        setLeq leq (Γ₁ ∪ liftedEqs ∪ {φt}) (Ω₁ ∪ {φs})
+      ) ->
+      -- right preserved
+      Γ₂ ⊆ Ω₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
+      ProofTree leq Ω₁ Ω₂
 
-  | instSchema {Γ Δ : Finset Expr} (σ : Subst) :
-      isFSet Γ ->
-      isFSet Δ ->
+  | rightSubstEq {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      (∀ σ ∈ eqs, σ.wellSorted) ->
+      φ.wellSorted ->
+      -- arguments of φ match the sorts of the subst pairs
+      (
+        match φ.sort with
+        | none => False
+        | some sort =>
+            let (args, _) := sort.splitArgs
+            eqs.map (·.sort) = args.map some
+      ) ->
+      (
+        let liftedEqs := eqs.map (·.liftEq) |>.toFinset
+
+        setLeq leq (Γ₁ ∪ liftedEqs) Ω₁
+      ) ->
+      (
+        let φs := φ.applied (eqs.map (·.source))
+        let φt := φ.applied (eqs.map (·.target))
+
+        setLeq leq (Γ₂ ∪ {φt}) (Ω₂ ∪ {φs})
+      ) ->
+      ProofTree leq Γ₁ Γ₂ ->
+      ProofTree leq Ω₁ Ω₂
+
+  | instSchema {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (σ : Subst) :
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      isFSet Ω₁ -> isFSet Ω₂ ->
       Subst.wellSorted σ ->
-      ProofTree leq Γ Δ ->
-      ProofTree leq (Γ.image (subst σ)) (Δ.image (subst σ))
+      -- the substituted sequent can be weakened
+      -- to the conclusion
+      (
+        let Γ₁' := Γ₁.image (Subst.subst σ)
+        let Γ₂' := Γ₂.image (Subst.subst σ)
+
+        sequentLeq leq Γ₁' Γ₂' Ω₁ Ω₂
+      ) ->
+      ProofTree leq Γ₁ Γ₂ ->
+      ProofTree leq Ω₁ Ω₂
