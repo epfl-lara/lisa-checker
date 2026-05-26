@@ -4,3 +4,4 @@ import Lisa.Basic
 import Lisa.Syntax
 import Lisa.Standard
 import Lisa.Weakened
+import Lisa.Bijection
