@@ -70,8 +70,8 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       Γ₁ ⊆ Ω₁ ->
       Δ₂ ⊆ Ω₂ ->
       -- only α removed
-      ∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ ->
-      ∀ φ ∈ (Δ₁ \ Ω₁), isSame leq α φ ->
+      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      (∀ φ ∈ (Δ₁ \ Ω₁), isSame leq α φ) ->
       ProofTree leq Ω₁ Ω₂
 
   -- left structural rules
@@ -84,7 +84,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       -- nothing missing on the right
       Γ₂ ⊆ Ω₂ ->
       -- only α and β removed on the left
-      ∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ∨ isSame leq β φ ->
+      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ∨ isSame leq β φ) ->
       -- α ∧ β added on the left
       ordContains leq (and α β) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -125,49 +125,96 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ) ->
       ProofTree leq Ω₁ Ω₂
 
-  | leftImp {Γ Ω Δ Ξ : Finset Expr} (φ ψ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
-      isFSet Ω ->
-      isFSet Ξ ->
-      isFormula φ ->
-      isFormula ψ ->
-      ProofTree leq Γ (insert φ Δ) ->
-      ProofTree leq (insert ψ Ω) Ξ ->
-      ProofTree leq (insert (imp φ ψ) (Γ ∪ Ω)) (Δ ∪ Ξ)
+  | leftImp {Γ₁ Γ₂ Δ₁ Δ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
+      -- left premise
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      -- right premise
+      isFSet Δ₁ -> isFSet Δ₂ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      isFormula α -> isFormula β ->
+      -- both premises derivable
+      ProofTree leq Γ₁ Γ₂ ->
+      ProofTree leq Δ₁ Δ₂ ->
+      -- nothing unnecessary removed
+      Γ₁ ⊆ Ω₁ ->
+      Δ₂ ⊆ Ω₂ ->
+      -- only α removed from the first premise right
+      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      -- only β removed from the second premise left
+      (∀ ψ ∈ (Δ₁ \ Ω₁), isSame leq β ψ) ->
+      -- α => β added on the left
+      ordContains leq (imp α β) Ω₁ ->
+      ProofTree leq Ω₁ Ω₂
 
-  | leftIff {Γ Δ : Finset Expr} (φ ψ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
-      isFormula φ ->
-      isFormula ψ ->
-      ProofTree leq (insert (imp φ ψ) (insert (imp ψ φ) Γ)) Δ ->
-      ProofTree leq (insert (iff φ ψ) Γ) Δ
+  | leftIff {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
+      -- premise
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      isFormula α -> isFormula β ->
+      -- premise derivable
+      ProofTree leq Γ₁ Γ₂ ->
+      -- nothing missing on the right
+      Γ₂ ⊆ Ω₂ ->
+      -- only implications removed on the left
+      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (imp α β) φ ∨ isSame leq (imp β α) φ) ->
+      -- α <=> β added on the left
+      ordContains leq (iff α β) Ω₁ ->
+      ProofTree leq Ω₁ Ω₂
 
-  | leftNot {Γ Δ : Finset Expr} (φ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
-      isFormula φ ->
-      ProofTree leq Γ (insert φ Δ) ->
-      ProofTree leq (insert (neg φ) Γ) Δ
+  | leftNot {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α : Expr) :
+      -- premise
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      isFormula α ->
+      -- premise derivable
+      ProofTree leq Γ₁ Γ₂ ->
+      -- nothing missing on the left
+      Γ₁ ⊆ Ω₁ ->
+      -- only α removed on the right
+      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      -- ¬α added on the left
+      ordContains leq (neg α) Ω₁ ->
+      ProofTree leq Ω₁ Ω₂
 
-  | leftForall {Γ Δ : Finset Expr} (x : SVar) (φ t : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
+  | leftForall {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α t : Expr) :
+      -- premise
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
-      isFormula φ ->
+      isFormula α ->
       isTerm t ->
-      ProofTree leq (insert (substOne x t φ) Γ) Δ ->
-      ProofTree leq (insert (forall_ x φ) Γ) Δ
+      -- premise derivable
+      ProofTree leq Γ₁ Γ₂ ->
+      -- nothing missing on the right
+      Γ₂ ⊆ Ω₂ ->
+      -- only α[t/x] removed on the left
+      ∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (substOne x t α) φ ->
+      -- ∀x. α added on the left
+      ordContains leq (forall_ x α) Ω₁ ->
+      ProofTree leq Ω₁ Ω₂
 
-  | leftExists {Γ Δ : Finset Expr} (x : SVar) (φ : Expr) :
-      isFSet Γ ->
-      isFSet Δ ->
+  | leftExists {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α : Expr) :
+      -- premise
+      isFSet Γ₁ -> isFSet Γ₂ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
-      isFormula φ ->
-      ProofTree leq (insert φ Γ) Δ ->
-      x ∉ freeVars (insert (exists_ x φ) Γ ∪ Δ) ->
-      ProofTree leq (insert (exists_ x φ) Γ) Δ
+      isFormula α ->
+      -- premise derivable
+      ProofTree leq Γ₁ Γ₂ ->
+      -- nothing missing on the right
+      Γ₂ ⊆ Ω₂ ->
+      -- only α removed on the left
+      ∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ->
+      -- ∃x. α added on the left
+      ordContains leq (exists_ x α) Ω₁ ->
+      -- x not free in conclusion
+      x ∉ freeVars (Ω₁ ∪ Ω₂) ->
+      ProofTree leq Ω₁ Ω₂
 
   -- right structural rules
 
