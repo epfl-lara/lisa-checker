@@ -406,6 +406,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
             let (args, _) := sort.splitArgs
             eqs.map (·.sort) = args.map some
       ) ->
+      isFormula (φ.applied (eqs.map (·.source))) ->
+      isFormula (φ.applied (eqs.map (·.target))) ->
+      isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
         let φs := φ.applied (eqs.map (·.source))
@@ -431,6 +434,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
             let (args, _) := sort.splitArgs
             eqs.map (·.sort) = args.map some
       ) ->
+      isFormula (φ.applied (eqs.map (·.source))) ->
+      isFormula (φ.applied (eqs.map (·.target))) ->
+      isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
 

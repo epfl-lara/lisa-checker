@@ -245,6 +245,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
             let (args, _) := sort.splitArgs
             eqs.map (·.sort) = args.map some
       ) ->
+      isFormula (φ.applied (eqs.map (·.source))) ->
+      isFormula (φ.applied (eqs.map (·.target))) ->
+      isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- Γ, φ(s_) ⊢ Δ
       ProofTree leq (insert (φ.applied (eqs.map (·.source))) Γ) Δ ->
       -- Γ, ∀x₁...xₙ. s₁(x_) = t₁(x_), ..., φ(t_) ⊢ Δ
@@ -270,6 +273,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
             let (args, _) := sort.splitArgs
             eqs.map (·.sort) = args.map some
       ) ->
+      isFormula (φ.applied (eqs.map (·.source))) ->
+      isFormula (φ.applied (eqs.map (·.target))) ->
+      isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- Γ ⊢ φ(s_), Δ
       ProofTree leq Γ (insert (φ.applied (eqs.map (·.source))) Δ) ->
       -- ∀x₁...xₙ. s₁(x_) = t₁(x_), ..., Γ ⊢ φ(t_), Δ

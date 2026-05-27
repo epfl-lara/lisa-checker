@@ -89,8 +89,10 @@ def sort : Expr -> Option LSort
       | some bodySort => some (x.sort >> bodySort)
       | none => none
 
+@[simp]
 def wellSorted (e : Expr) : Prop := e.sort.isSome
 
+@[simp]
 def hasSort (e : Expr) (s : LSort) : Prop := e.sort = some s
 
 def isFunctional (e : Expr) : Prop := e.sort.map LSort.isFunctional = some true
@@ -99,8 +101,10 @@ def isPredicate (e : Expr) : Prop := e.sort.map LSort.isPredicate = some true
 
 end Expr
 
+@[simp]
 def isFormula (e : Expr) : Prop := e.hasSort prop
 
+@[simp]
 def isTerm (e : Expr) : Prop := e.hasSort ind
 
 @[simp]
@@ -119,8 +123,10 @@ namespace Subst
 def freeVars (σ : Subst) : Finset SVar :=
   σ.toList.foldl (fun acc (x, e) => acc ∪ {x} ∪ e.freeVars) ∅
 
-def wellSorted (σ : Subst) : Prop :=
-  ∀ x e, σ.find? x = some e -> e.hasSort x.sort
+@[simp]
+def wellSorted : Subst -> Prop
+  | .nil => True
+  | .cons x e rest => e.hasSort x.sort ∧ wellSorted rest
 
 /-- Capture-avoiding simultaneous substitution. -/
 def subst (σ : Subst) : Expr -> Expr
@@ -139,6 +145,84 @@ def subst (σ : Subst) : Expr -> Expr
         else
           x
       .lam x' (subst (σ.insert x (.var x')) body)
+
+@[simp]
+theorem wellSorted_replace {σ : Subst} {x : SVar} {e : Expr}
+    (hσ : wellSorted σ) (he : e.hasSort x.sort) :
+    wellSorted (σ.replace x e) := by
+  induction σ with
+  | nil =>
+      simp [Lean.AssocList.replace]
+  | cons y v rest ih =>
+      simp [Lean.AssocList.replace] at hσ ⊢
+      by_cases hyx : (y == x) = true
+      · simp [hyx, hσ]
+        have hyxEq : y = x := beq_iff_eq.mp hyx
+        subst hyxEq
+        exact he
+      · have hyxFalse : (y == x) = false := by
+          cases h : y == x <;> simp [h] at hyx ⊢
+        simp [hyxFalse, hσ, ih hσ.2]
+
+@[simp]
+theorem wellSorted_insert {σ : Subst} {x : SVar} {e : Expr}
+    (hσ : wellSorted σ) (he : e.hasSort x.sort) :
+    wellSorted (σ.insert x e) := by
+  unfold Lean.AssocList.insert
+  by_cases hcontains : Lean.AssocList.contains x σ = true
+  · simp [hcontains, wellSorted_replace hσ he]
+  · simp [hcontains, Lean.AssocList.insertNew, hσ]
+    exact he
+
+theorem subst_preserves_sort {σ : Subst} (hσ : wellSorted σ) :
+    ∀ e, (subst σ e).sort = e.sort := by
+  intro e
+  induction e generalizing σ with
+  | var x =>
+      simp [subst]
+      cases hfind : σ.find? x with
+      | none =>
+          simp
+      | some v =>
+          induction σ with
+          | nil =>
+              simp [Lean.AssocList.find?] at hfind
+          | cons y w rest ih =>
+              simp [Lean.AssocList.find?] at hfind hσ
+              by_cases hyx : (y == x) = true
+              · simp [hyx] at hfind
+                cases hfind
+                have hyxEq : y = x := beq_iff_eq.mp hyx
+                subst hyxEq
+                exact hσ.1
+              · have hyxFalse : (y == x) = false := by
+                  cases h : y == x <;> simp [h] at hyx ⊢
+                simp [hyxFalse] at hfind
+                exact ih hσ.2 hfind
+  | const c =>
+      simp [subst]
+  | app f a ihf iha =>
+      simp [subst, ihf hσ, iha hσ]
+  | lam x body ih =>
+      dsimp [subst, Expr.sort]
+      set x' :=
+        if x ∈ σ.freeVars then
+          { id := freshId (Finset.image (fun x => x.id) σ.freeVars) x.id, sort := x.sort }
+        else
+          x
+      have hxsort : x'.sort = x.sort := by
+        dsimp [x']
+        split <;> rfl
+      have hvar : (Expr.var x').hasSort x.sort := by
+        simp [Expr.hasSort, hxsort]
+      rw [ih (wellSorted_insert hσ hvar)]
+      cases body.sort <;> simp [hxsort]
+
+theorem subst_preserves_hasSort {σ : Subst} (hσ : wellSorted σ)
+    {e : Expr} {s : LSort} (h : e.hasSort s) :
+    (subst σ e).hasSort s := by
+  rw [Expr.hasSort, subst_preserves_sort hσ e]
+  exact h
 
 end Subst
 
