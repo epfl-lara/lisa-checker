@@ -22,6 +22,7 @@ def NegAntitone (leq : Order) : Prop :=
 def NegInvariant (leq : Order) : Prop :=
   ∀ {α β : Expr}, isSame leq α β -> isSame leq (.neg α) (.neg β)
 
+/-- Antitone wrt `leq` implies negation invariance for `isSame leq` -/
 @[simp]
 lemma NegAntitone.negInvariant {leq : Order} (hneg : NegAntitone leq) :
     NegInvariant leq := by

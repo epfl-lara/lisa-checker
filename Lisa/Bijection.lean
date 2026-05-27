@@ -1083,9 +1083,9 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         hle
 
 theorem standard_eq_weakened (leq : Order) (Γ Δ : Finset Expr)
-    (href : Reflexive leq) (hneg : NegInvariant leq) :
+    (href : Reflexive leq) (hneg : NegAntitone leq) :
     Nonempty (Standard.ProofTree leq Γ Δ) ↔
     Nonempty (Weakened.ProofTree leq Γ Δ) := by
   constructor <;> intro ⟨pf⟩
   · exact ⟨fwdEmbed href pf⟩
-  · exact ⟨bwdEmbed href hneg pf⟩
+  · exact ⟨bwdEmbed href hneg.negInvariant pf⟩
