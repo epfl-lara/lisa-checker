@@ -53,8 +53,10 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | cut {Γ₁ Γ₂ Δ₁ Δ₂ Ω₁ Ω₂ : Finset Expr} (α : Expr) :
       -- left premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- right premise
       isFSet Δ₁ -> isFSet Δ₂ ->
+      ProofTree leq Δ₁ Δ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
@@ -64,14 +66,13 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       -- only α removed
       (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
       (∀ φ ∈ (Δ₁ \ Ω₁), isSame leq α φ) ->
-      ProofTree leq Γ₁ Γ₂ ->
-      ProofTree leq Δ₁ Δ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   -- left structural rules
   | leftAnd {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
@@ -81,13 +82,14 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ∨ isSame leq β φ) ->
       -- α ∧ β added on the left
       ordContains leq (and α β) Ω₁ ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | leftOr {prems : List (AnnotatedSequent Expr)}
       {Ω₁ Ω₂ : Finset Expr} :
       -- premises nonempty
       prems ≠ ∅ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
       -- all premises well sorted
       (∀ prem ∈ prems,
         let ⟨Γ, Δ, φ⟩ := prem
@@ -120,14 +122,13 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftImp {Γ₁ Γ₂ Δ₁ Δ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- left premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- right premise
       isFSet Δ₁ -> isFSet Δ₂ ->
+      ProofTree leq Δ₁ Δ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
-      -- both premises derivable
-      ProofTree leq Γ₁ Γ₂ ->
-      ProofTree leq Δ₁ Δ₂ ->
       -- nothing unnecessary removed
       Γ₁ ⊆ Ω₁ ->
       Δ₂ ⊆ Ω₂ ->
@@ -142,11 +143,10 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftIff {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the right
       Γ₂ ⊆ Ω₂ ->
       -- only implications removed on the left
@@ -158,11 +158,10 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftNot {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the left
       Γ₁ ⊆ Ω₁ ->
       -- only α removed on the right
@@ -174,13 +173,12 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftForall {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α t : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
       isFormula α ->
       isTerm t ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the right
       Γ₂ ⊆ Ω₂ ->
       -- only α[t/x] removed on the left
@@ -192,12 +190,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftExists {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
       isFormula α ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the right
       Γ₂ ⊆ Ω₂ ->
       -- only α removed on the left
@@ -214,6 +211,8 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       {Ω₁ Ω₂ : Finset Expr} :
       -- premises nonempty
       prems ≠ ∅ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
       -- all premises well sorted
       (∀ prem ∈ prems,
         let ⟨Γ, Δ, φ⟩ := prem
@@ -246,6 +245,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightOr {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
@@ -255,17 +255,15 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ ∨ isSame leq β φ) ->
       -- α ∨ β added on the right
       ordContains leq (or α β) Ω₂ ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | rightImp {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- only α removed on the left
       (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ) ->
       -- only β removed on the right
@@ -277,14 +275,13 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightIff {Γ₁ Γ₂ Δ₁ Δ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
       -- left premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- right premise
       isFSet Δ₁ -> isFSet Δ₂ ->
+      ProofTree leq Δ₁ Δ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
-      -- both premises derivable
-      ProofTree leq Γ₁ Γ₂ ->
-      ProofTree leq Δ₁ Δ₂ ->
       -- nothing missing on the left
       Γ₁ ⊆ Ω₁ ->
       Δ₁ ⊆ Ω₁ ->
@@ -298,11 +295,10 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightNot {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the right
       Γ₂ ⊆ Ω₂ ->
       -- only α removed on the left
@@ -314,12 +310,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightForall {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
       isFormula α ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the left
       Γ₁ ⊆ Ω₁ ->
       -- only α removed on the right
@@ -333,13 +328,12 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightExists {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α t : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
       isFormula α ->
       isTerm t ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the left
       Γ₁ ⊆ Ω₁ ->
       -- only α[t/x] removed on the right
@@ -351,13 +345,12 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | rightEpsilon {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (x : SVar) (α t : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       x.sort = ind ->
       isFormula α ->
       isTerm t ->
-      -- premise derivable
-      ProofTree leq Γ₁ Γ₂ ->
       -- nothing missing on the left
       Γ₁ ⊆ Ω₁ ->
       -- only α[t/x] removed on the right
@@ -371,6 +364,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
   | leftRefl {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (t : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       -- reflexive term
@@ -379,7 +373,6 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       Γ₂ ⊆ Ω₂ ->
       -- only eq t t removed on the left
       (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (eq t t) φ) ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | rightRefl {Ω₁ Ω₂ : Finset Expr} (t : Expr) :
@@ -392,6 +385,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
 
   | leftSubstEq {Γ₁ Γ₂ Ω₁ Ω₂: Finset Expr} (eqs : List SubstPair) (φ : Expr) :
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
@@ -415,11 +409,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ) ->
       -- right preserved
       Γ₂ ⊆ Ω₂ ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | rightSubstEq {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
@@ -445,11 +439,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
 
         setLeq leq (Γ₂ ∪ {φt}) (Ω₂ ∪ {φs})
       ) ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | instSchema {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (σ : Subst) :
       isFSet Γ₁ -> isFSet Γ₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       Subst.wellSorted σ ->
       -- the substituted sequent can be weakened
@@ -460,5 +454,4 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
 
         sequentLeq leq Γ₁' Γ₂' Ω₁ Ω₂
       ) ->
-      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
