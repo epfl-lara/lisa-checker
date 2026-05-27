@@ -240,6 +240,184 @@ private theorem isFormula_eq {s t : Expr} (hs : isTerm s) (ht : isTerm t) :
   dsimp [isFormula, hasSort, isTerm] at hs ht ⊢
   simp [Expr.eq, hs, ht]
 
+private def foldOrFrom (acc : Expr) (prems : List (AnnotatedSequent Expr)) : Expr :=
+  (prems.map (·.val)).foldl Expr.or acc
+
+private def foldAndFrom (acc : Expr) (prems : List (AnnotatedSequent Expr)) : Expr :=
+  (prems.map (·.val)).foldl Expr.and acc
+
+@[simp]
+private theorem isFormula_foldOrFrom {acc : Expr} {prems : List (AnnotatedSequent Expr)}
+    (hacc : isFormula acc)
+    (hprems : ∀ prem ∈ prems, isFormula prem.val) :
+    isFormula (foldOrFrom acc prems) := by
+  induction prems generalizing acc with
+  | nil =>
+      simpa [foldOrFrom] using hacc
+  | cons prem rest ih =>
+      simp [foldOrFrom]
+      apply ih
+      · exact isFormula_or hacc (hprems prem (by simp))
+      · intro q hq
+        exact hprems q (by simp [hq])
+
+@[simp]
+private theorem isFormula_foldAndFrom {acc : Expr} {prems : List (AnnotatedSequent Expr)}
+    (hacc : isFormula acc)
+    (hprems : ∀ prem ∈ prems, isFormula prem.val) :
+    isFormula (foldAndFrom acc prems) := by
+  induction prems generalizing acc with
+  | nil =>
+      simpa [foldAndFrom] using hacc
+  | cons prem rest ih =>
+      simp [foldAndFrom]
+      apply ih
+      · exact isFormula_and hacc (hprems prem (by simp))
+      · intro q hq
+        exact hprems q (by simp [hq])
+
+private def weakenLeftOrPrem {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+    {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
+    (prem : AnnotatedSequent Expr)
+    (hsorted : isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val)
+    (hpreserved :
+      prem.post ⊆ Ω₂ ∧
+      ∀ φ ∈ (prem.pre \ Ω₁), isSame leq prem.val φ)
+    (pf : Standard.ProofTree leq prem.pre prem.post) :
+    Standard.ProofTree leq (insert prem.val Ω₁) Ω₂ :=
+  Standard.ProofTree.weakening
+    hsorted.1 hsorted.2.1
+    (isFSet_insert hsorted.2.2 hΩ₁) hΩ₂
+    pf
+    (sequentLeq_of_setLeq hneg
+      (setLeq_to_insert_of_sdiff href hpreserved.2)
+      (setLeq_of_subset href hpreserved.1))
+
+private def weakenRightAndPrem {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+    {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
+    (prem : AnnotatedSequent Expr)
+    (hsorted : isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val)
+    (hpreserved :
+      prem.pre ⊆ Ω₁ ∧
+      ∀ φ ∈ (prem.post \ Ω₂), isSame leq prem.val φ)
+    (pf : Standard.ProofTree leq prem.pre prem.post) :
+    Standard.ProofTree leq Ω₁ (insert prem.val Ω₂) :=
+  Standard.ProofTree.weakening
+    hsorted.1 hsorted.2.1
+    hΩ₁ (isFSet_insert hsorted.2.2 hΩ₂)
+    pf
+    (sequentLeq_of_setLeq hneg
+      (setLeq_of_subset href hpreserved.1)
+      (setLeq_to_insert_of_sdiff href hpreserved.2))
+
+private def foldLeftOrStandard {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+    {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
+    (acc : Expr) (hacc : isFormula acc)
+    (pfacc : Standard.ProofTree leq (insert acc Ω₁) Ω₂)
+    (rest : List (AnnotatedSequent Expr))
+    (hsortedRest :
+      ∀ prem ∈ rest, isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val)
+    (hstdRest :
+      ∀ prem ∈ rest, Standard.ProofTree leq prem.pre prem.post)
+    (hpreservedRest :
+      ∀ prem ∈ rest,
+        prem.post ⊆ Ω₂ ∧
+        ∀ φ ∈ (prem.pre \ Ω₁), isSame leq prem.val φ) :
+    Standard.ProofTree leq (insert (foldOrFrom acc rest) Ω₁) Ω₂ :=
+  match rest with
+  | [] => by
+      simpa [foldOrFrom] using pfacc
+  | prem :: rest' =>
+      let hpremSorted : isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val := by
+        simpa using hsortedRest prem (by simp)
+      let hpremPreserved :
+          prem.post ⊆ Ω₂ ∧
+          ∀ φ ∈ (prem.pre \ Ω₁), isSame leq prem.val φ := by
+        simpa using hpreservedRest prem (by simp)
+      let pfPrem : Standard.ProofTree leq (insert prem.val Ω₁) Ω₂ :=
+        weakenLeftOrPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
+          (hstdRest prem (by simp))
+      let combined : Standard.ProofTree leq (insert (or acc prem.val) Ω₁) Ω₂ :=
+        Standard.ProofTree.weakening
+          (isFSet_insert (isFormula_or hacc hpremSorted.2.2)
+            (isFSet_union hΩ₁ hΩ₁))
+          (isFSet_union hΩ₂ hΩ₂)
+          (isFSet_insert (isFormula_or hacc hpremSorted.2.2) hΩ₁)
+          hΩ₂
+          (Standard.ProofTree.leftOr acc prem.val
+            hΩ₁ hΩ₂ hΩ₁ hΩ₂ hacc hpremSorted.2.2 pfacc pfPrem)
+          (sequentLeq_of_setLeq hneg
+            (setLeq_insert_union_self_to_insert href Ω₁ (or acc prem.val))
+            (setLeq_union_self href Ω₂))
+      by
+        simpa [foldOrFrom] using
+          foldLeftOrStandard href hneg hΩ₁ hΩ₂
+            (or acc prem.val) (isFormula_or hacc hpremSorted.2.2)
+            combined rest'
+            (by
+              intro q hq
+              exact hsortedRest q (by simp [hq]))
+            (by
+              intro q hq
+              exact hstdRest q (by simp [hq]))
+            (by
+              intro q hq
+              exact hpreservedRest q (by simp [hq]))
+
+private def foldRightAndStandard {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+    {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
+    (acc : Expr) (hacc : isFormula acc)
+    (pfacc : Standard.ProofTree leq Ω₁ (insert acc Ω₂))
+    (rest : List (AnnotatedSequent Expr))
+    (hsortedRest :
+      ∀ prem ∈ rest, isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val)
+    (hstdRest :
+      ∀ prem ∈ rest, Standard.ProofTree leq prem.pre prem.post)
+    (hpreservedRest :
+      ∀ prem ∈ rest,
+        prem.pre ⊆ Ω₁ ∧
+        ∀ φ ∈ (prem.post \ Ω₂), isSame leq prem.val φ) :
+    Standard.ProofTree leq Ω₁ (insert (foldAndFrom acc rest) Ω₂) :=
+  match rest with
+  | [] => by
+      simpa [foldAndFrom] using pfacc
+  | prem :: rest' =>
+      let hpremSorted : isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val := by
+        simpa using hsortedRest prem (by simp)
+      let hpremPreserved :
+          prem.pre ⊆ Ω₁ ∧
+          ∀ φ ∈ (prem.post \ Ω₂), isSame leq prem.val φ := by
+        simpa using hpreservedRest prem (by simp)
+      let pfPrem : Standard.ProofTree leq Ω₁ (insert prem.val Ω₂) :=
+        weakenRightAndPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
+          (hstdRest prem (by simp))
+      let combined : Standard.ProofTree leq Ω₁ (insert (and acc prem.val) Ω₂) :=
+        Standard.ProofTree.weakening
+          (isFSet_union hΩ₁ hΩ₁)
+          (isFSet_insert (isFormula_and hacc hpremSorted.2.2)
+            (isFSet_union hΩ₂ hΩ₂))
+          hΩ₁
+          (isFSet_insert (isFormula_and hacc hpremSorted.2.2) hΩ₂)
+          (Standard.ProofTree.rightAnd acc prem.val
+            hΩ₁ hΩ₂ hΩ₁ hΩ₂ hacc hpremSorted.2.2 pfacc pfPrem)
+          (sequentLeq_of_setLeq hneg
+            (setLeq_union_self href Ω₁)
+            (setLeq_insert_union_self_to_insert href Ω₂ (and acc prem.val)))
+      by
+        simpa [foldAndFrom] using
+          foldRightAndStandard href hneg hΩ₁ hΩ₂
+            (and acc prem.val) (isFormula_and hacc hpremSorted.2.2)
+            combined rest'
+            (by
+              intro q hq
+              exact hsortedRest q (by simp [hq]))
+            (by
+              intro q hq
+              exact hstdRest q (by simp [hq]))
+            (by
+              intro q hq
+              exact hpreservedRest q (by simp [hq]))
+
 def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
     Standard.ProofTree leq Γ Δ ->
     Weakened.ProofTree leq Γ Δ
@@ -723,37 +901,61 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
         ht
         (ordContains_refl href (eq t t) ∅)
   | .leftSubstEq eqs φ hΓ hΔ heqs hφ hargs hφs hφt hlift pf =>
+      let liftedEqs := (eqs.map (·.liftEq)).toFinset
+      let φs := φ.applied (eqs.map (·.source))
+      let φt := φ.applied (eqs.map (·.target))
       Weakened.ProofTree.leftSubstEq eqs φ
         (isFSet_insert hφs hΓ) hΔ
         (fwdEmbed href pf)
         (isFSet_union hlift (isFSet_insert hφt hΓ)) hΔ
         heqs hφ hargs hφs hφt hlift
         (by
-          dsimp
+          dsimp [φs, φt, liftedEqs]
           intro χ hχ
-          refine ⟨χ, ?_, isSame_refl href χ⟩
-          simpa [Finset.mem_union, Finset.mem_insert, Finset.mem_singleton,
-            or_assoc, or_left_comm, or_comm] using hχ)
+          simp only [Finset.mem_insert] at hχ
+          rcases hχ with rfl | hχ
+          · refine ⟨φs, ?_, isSame_refl href φs⟩
+            simp [φs]
+          · refine ⟨χ, ?_, isSame_refl href χ⟩
+            simp [hχ])
+        (by
+          dsimp [φt, liftedEqs]
+          apply setLeq_of_subset href
+          intro χ hχ
+          simp only [Finset.mem_union, Finset.mem_singleton] at hχ
+          rcases hχ with hχ | hχ
+          · simp [hχ]
+          · subst χ
+            simp)
         (by
           intro χ hχ
           exact hχ)
   | .rightSubstEq eqs φ hΓ hΔ heqs hφ hargs hφs hφt hlift pf =>
+      let liftedEqs := (eqs.map (·.liftEq)).toFinset
+      let φs := φ.applied (eqs.map (·.source))
+      let φt := φ.applied (eqs.map (·.target))
       Weakened.ProofTree.rightSubstEq eqs φ
         hΓ (isFSet_insert hφs hΔ)
         (fwdEmbed href pf)
         (isFSet_union hlift hΓ) (isFSet_insert hφt hΔ)
         heqs hφ hargs hφs hφt hlift
         (by
-          dsimp
+          dsimp [liftedEqs]
+          apply setLeq_of_subset href
           intro χ hχ
-          refine ⟨χ, ?_, isSame_refl href χ⟩
           simpa [Finset.mem_union, or_assoc, or_left_comm, or_comm] using hχ)
         (by
-          dsimp
-          intro χ hχ
-          refine ⟨χ, ?_, isSame_refl href χ⟩
-          simpa [Finset.mem_union, Finset.mem_insert, Finset.mem_singleton,
-            or_assoc, or_left_comm, or_comm] using hχ)
+          dsimp [φs, φt]
+          constructor
+          · intro χ hχ
+            simp only [Finset.mem_insert] at hχ
+            rcases hχ with rfl | hχ
+            · refine ⟨φs, ?_, isSame_refl href φs⟩
+              simp [φs]
+            · refine ⟨χ, ?_, isSame_refl href χ⟩
+              simp [hχ]
+          · refine ⟨φt, ?_, isSame_refl href φt⟩
+            simp [φt])
   | .instSchema σ hΓ hΔ hσ pf =>
       Weakened.ProofTree.instSchema σ
         hΓ hΔ
@@ -827,8 +1029,45 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         (sequentLeq_of_setLeq hneg
           (setLeq_insert_of_ordContains href hadd)
           (setLeq_refl href Ω₂))
-  | .leftOr hne hΩ₁ hΩ₂ hsorted hprems hpreserved hadd =>
-      sorry
+  | .leftOr (prems := prems) (Ω₁ := Ω₁) (Ω₂ := Ω₂) hne hΩ₁ hΩ₂ hsorted hprems hpreserved hadd =>
+      match prems with
+      | [] => False.elim (hne rfl)
+      | prem :: rest =>
+          let hpremSorted :
+              isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val := by
+            simpa using hsorted prem (by simp)
+          let hpremPreserved :
+              prem.post ⊆ Ω₂ ∧
+              ∀ φ ∈ (prem.pre \ Ω₁), isSame leq prem.val φ := by
+            simpa using hpreserved prem (by simp)
+          let firstPf : Standard.ProofTree leq (insert prem.val Ω₁) Ω₂ :=
+            weakenLeftOrPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
+              (bwdEmbed href hneg (hprems prem (by simp)))
+          let foldedPf : Standard.ProofTree leq (insert (foldOrFrom prem.val rest) Ω₁) Ω₂ :=
+            foldLeftOrStandard href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
+              (by
+                intro q hq
+                exact hsorted q (by simp [hq]))
+              (by
+                intro q hq
+                exact bwdEmbed href hneg (hprems q (by simp [hq])))
+              (by
+                intro q hq
+                exact hpreserved q (by simp [hq]))
+          Standard.ProofTree.weakening
+            (isFSet_insert
+              (isFormula_foldOrFrom hpremSorted.2.2
+                (by
+                  intro q hq
+                  exact (hsorted q (by simp [hq])).2.2))
+              hΩ₁)
+            hΩ₂
+            hΩ₁ hΩ₂
+            foldedPf
+            (sequentLeq_of_setLeq hneg
+              (setLeq_insert_of_ordContains href (by
+                simpa [foldOrFrom] using hadd))
+              (setLeq_refl href Ω₂))
   | .leftImp (Ω₁ := Ω₁) (Ω₂ := Ω₂) α β hΓ₁ hΓ₂ pf₁ hΔ₁ hΔ₂ pf₂ hΩ₁ hΩ₂ hα hβ hsub₁ hsub₂ hrem₁ hrem₂ hadd =>
       let pf₁' : Standard.ProofTree leq Ω₁ (insert α Ω₂) :=
         Standard.ProofTree.weakening
@@ -920,8 +1159,45 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         (sequentLeq_of_setLeq hneg
           (setLeq_insert_of_ordContains href hadd)
           (setLeq_refl href Ω₂))
-  | .rightAnd hne hΩ₁ hΩ₂ hsorted hprems hpreserved hadd =>
-      sorry
+  | .rightAnd (prems := prems) (Ω₁ := Ω₁) (Ω₂ := Ω₂) hne hΩ₁ hΩ₂ hsorted hprems hpreserved hadd =>
+      match prems with
+      | [] => False.elim (hne rfl)
+      | prem :: rest =>
+          let hpremSorted :
+              isFSet prem.pre ∧ isFSet prem.post ∧ isFormula prem.val := by
+            simpa using hsorted prem (by simp)
+          let hpremPreserved :
+              prem.pre ⊆ Ω₁ ∧
+              ∀ φ ∈ (prem.post \ Ω₂), isSame leq prem.val φ := by
+            simpa using hpreserved prem (by simp)
+          let firstPf : Standard.ProofTree leq Ω₁ (insert prem.val Ω₂) :=
+            weakenRightAndPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
+              (bwdEmbed href hneg (hprems prem (by simp)))
+          let foldedPf : Standard.ProofTree leq Ω₁ (insert (foldAndFrom prem.val rest) Ω₂) :=
+            foldRightAndStandard href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
+              (by
+                intro q hq
+                exact hsorted q (by simp [hq]))
+              (by
+                intro q hq
+                exact bwdEmbed href hneg (hprems q (by simp [hq])))
+              (by
+                intro q hq
+                exact hpreserved q (by simp [hq]))
+          Standard.ProofTree.weakening
+            hΩ₁
+            (isFSet_insert
+              (isFormula_foldAndFrom hpremSorted.2.2
+                (by
+                  intro q hq
+                  exact (hsorted q (by simp [hq])).2.2))
+              hΩ₂)
+            hΩ₁ hΩ₂
+            foldedPf
+            (sequentLeq_of_setLeq hneg
+              (setLeq_refl href Ω₁)
+              (setLeq_insert_of_ordContains href (by
+                simpa [foldAndFrom] using hadd)))
   | .rightOr (Ω₁ := Ω₁) (Ω₂ := Ω₂) α β hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ hα hβ hsub hrem hadd =>
       let pf' : Standard.ProofTree leq Ω₁ (insert α (insert β Ω₂)) :=
         Standard.ProofTree.weakening
@@ -1062,10 +1338,87 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         (sequentLeq_of_setLeq hneg
           (setLeq_empty Ω₁)
           (setLeq_singleton_of_ordContains hadd))
-  | .leftSubstEq eqs φ hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift hle hsub =>
-      sorry
-  | .rightSubstEq eqs φ hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift hleft hright =>
-      sorry
+  | .leftSubstEq (Ω₁ := Ω₁) (Ω₂ := Ω₂) eqs φ hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift hle hadded hsub =>
+      let liftedEqs := (eqs.map (·.liftEq)).toFinset
+      let φs := φ.applied (eqs.map (·.source))
+      let φt := φ.applied (eqs.map (·.target))
+      let prem : Standard.ProofTree leq (insert φs Ω₁) Ω₂ :=
+        Standard.ProofTree.weakening
+          hΓ₁ hΓ₂
+          (isFSet_insert hφs hΩ₁) hΩ₂
+          (bwdEmbed href hneg pf)
+          (sequentLeq_of_setLeq hneg
+            (by
+              dsimp [φs] at hle ⊢
+              intro χ hχ
+              rcases hle χ hχ with ⟨ψ, hψ, hsame⟩
+              refine ⟨ψ, ?_, hsame⟩
+              simp only [Finset.mem_union, Finset.mem_singleton] at hψ
+              rcases hψ with hψ | hψ
+              · exact Finset.mem_insert_of_mem hψ
+              · subst ψ
+                exact Finset.mem_insert_self _ _)
+            (setLeq_of_subset href hsub))
+      let substPf : Standard.ProofTree leq (liftedEqs ∪ insert φt Ω₁) Ω₂ :=
+        Standard.ProofTree.leftSubstEq eqs φ
+          hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift prem
+      Standard.ProofTree.weakening
+        (isFSet_union hlift (isFSet_insert hφt hΩ₁)) hΩ₂
+        hΩ₁ hΩ₂
+        substPf
+        (sequentLeq_of_setLeq hneg
+          (by
+            dsimp [liftedEqs, φt] at hadded ⊢
+            intro χ hχ
+            simp only [Finset.mem_union, Finset.mem_insert] at hχ
+            rcases hχ with hχ | hχ
+            · exact hadded χ (by simp [hχ])
+            · rcases hχ with rfl | hχ
+              · exact hadded (φ.applied (List.map (fun x => x.target) eqs)) (by simp)
+              · exact ⟨χ, hχ, isSame_refl href χ⟩)
+          (setLeq_refl href Ω₂))
+  | .rightSubstEq (Ω₁ := Ω₁) (Ω₂ := Ω₂) eqs φ hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift hleft hright =>
+      let liftedEqs := (eqs.map (·.liftEq)).toFinset
+      let φs := φ.applied (eqs.map (·.source))
+      let φt := φ.applied (eqs.map (·.target))
+      let prem : Standard.ProofTree leq Ω₁ (insert φs Ω₂) :=
+        Standard.ProofTree.weakening
+          hΓ₁ hΓ₂
+          hΩ₁ (isFSet_insert hφs hΩ₂)
+          (bwdEmbed href hneg pf)
+          (sequentLeq_of_setLeq hneg
+            (by
+              dsimp [liftedEqs] at hleft
+              intro χ hχ
+              exact hleft χ (by simp [hχ]))
+            (by
+              dsimp [φs] at hright ⊢
+              intro χ hχ
+              rcases hright.1 χ hχ with ⟨ψ, hψ, hsame⟩
+              refine ⟨ψ, ?_, hsame⟩
+              simp only [Finset.mem_union, Finset.mem_singleton] at hψ
+              rcases hψ with hψ | hψ
+              · exact Finset.mem_insert_of_mem hψ
+              · subst ψ
+                exact Finset.mem_insert_self _ _))
+      let substPf : Standard.ProofTree leq (liftedEqs ∪ Ω₁) (insert φt Ω₂) :=
+        Standard.ProofTree.rightSubstEq eqs φ
+          hΩ₁ hΩ₂ heqs hφ hargs hφs hφt hlift prem
+      Standard.ProofTree.weakening
+        (isFSet_union hlift hΩ₁) (isFSet_insert hφt hΩ₂)
+        hΩ₁ hΩ₂
+        substPf
+        (sequentLeq_of_setLeq hneg
+          (by
+            dsimp [liftedEqs] at hleft ⊢
+            intro χ hχ
+            simp only [Finset.mem_union] at hχ
+            rcases hχ with hχ | hχ
+            · exact hleft χ (by simp [hχ])
+            · exact ⟨χ, hχ, isSame_refl href χ⟩)
+          (by
+            dsimp [φt] at hright ⊢
+            exact setLeq_insert_of_ordContains href hright.2))
   | .instSchema σ hΓ₁ hΓ₂ pf hΩ₁ hΩ₂ hσ hle =>
       Standard.ProofTree.weakening
         (by
