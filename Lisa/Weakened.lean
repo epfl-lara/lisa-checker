@@ -8,14 +8,6 @@ import Lisa.Standard
 
 open Lisa
 
-@[simp]
-def ordContains (leq : Order) (α : Expr) (Γ : Finset Expr) : Prop :=
-  ∃ β ∈ Γ, leq α β
-
-@[simp]
-def isSame (leq : Order) (α β : Expr) : Prop :=
-  leq α β ∧ leq β α
-
 /-- A sequent annotated with one additional value. Used as premise carrying
   proof step information for multi-premise steps -/
 structure AnnotatedSequent (α : Type) where
@@ -72,6 +64,8 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       -- only α removed
       (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
       (∀ φ ∈ (Δ₁ \ Ω₁), isSame leq α φ) ->
+      ProofTree leq Γ₁ Γ₂ ->
+      ProofTree leq Δ₁ Δ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   -- left structural rules
@@ -87,6 +81,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ∨ isSame leq β φ) ->
       -- α ∧ β added on the left
       ordContains leq (and α β) Ω₁ ->
+      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | leftOr {prems : List (AnnotatedSequent Expr)}
@@ -260,6 +255,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ ∨ isSame leq β φ) ->
       -- α ∨ β added on the right
       ordContains leq (or α β) Ω₂ ->
+      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | rightImp {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (α β : Expr) :
@@ -383,6 +379,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       Γ₂ ⊆ Ω₂ ->
       -- only eq t t removed on the left
       (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (eq t t) φ) ->
+      ProofTree leq Γ₁ Γ₂ ->
       ProofTree leq Ω₁ Ω₂
 
   | rightRefl {Ω₁ Ω₂ : Finset Expr} (t : Expr) :

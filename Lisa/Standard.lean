@@ -4,13 +4,26 @@ open Lisa
 
 abbrev Order : Type := Expr -> Expr -> Prop
 
-def setLeq (leq : Order) (s t : Finset Expr) : Prop :=
-  ∀ φ ∈ s, ∃ ψ ∈ t, leq φ ψ
+@[simp]
+def isSame (leq : Order) (α β : Expr) : Prop :=
+  leq α β ∧ leq β α
 
+@[simp]
+def ordContains (leq : Order) (α : Expr) (Γ : Finset Expr) : Prop :=
+  ∃ β ∈ Γ, isSame leq α β
+
+@[simp]
+def setLeq (leq : Order) (s t : Finset Expr) : Prop :=
+  ∀ φ ∈ s, ∃ ψ ∈ t, isSame leq φ ψ
+
+def NegAntitone (leq : Order) : Prop :=
+  ∀ {α β : Expr}, leq α β -> leq (.neg β) (.neg α)
+
+@[simp]
 def sequentLeq (leq : Order) (Γ Δ Γ' Δ' : Finset Expr) : Prop :=
-  let combinedPre := Γ ∪ Δ.image Expr.neg
-  let combinedPost := Γ' ∪ Δ'.image Expr.neg
-  setLeq leq combinedPre combinedPost
+  let seq1 := (Γ.image Expr.neg) ∪ Δ
+  let seq2 := (Γ'.image Expr.neg) ∪ Δ'
+  setLeq leq seq1 seq2
 
 structure SubstPair where
     source : Expr
