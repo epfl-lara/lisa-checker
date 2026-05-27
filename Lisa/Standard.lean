@@ -19,6 +19,15 @@ def setLeq (leq : Order) (s t : Finset Expr) : Prop :=
 def NegAntitone (leq : Order) : Prop :=
   ∀ {α β : Expr}, leq α β -> leq (.neg β) (.neg α)
 
+def NegInvariant (leq : Order) : Prop :=
+  ∀ {α β : Expr}, isSame leq α β -> isSame leq (.neg α) (.neg β)
+
+@[simp]
+lemma NegAntitone.negInvariant {leq : Order} (hneg : NegAntitone leq) :
+    NegInvariant leq := by
+  intro α β hsame
+  exact ⟨hneg hsame.2, hneg hsame.1⟩
+
 @[simp]
 def sequentLeq (leq : Order) (Γ Δ Γ' Δ' : Finset Expr) : Prop :=
   let seq1 := (Γ.image Expr.neg) ∪ Δ
