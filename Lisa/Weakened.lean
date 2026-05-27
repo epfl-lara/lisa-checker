@@ -400,12 +400,18 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFormula (φ.applied (eqs.map (·.source))) ->
       isFormula (φ.applied (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
+      -- left preserved except φ(s_)
+      (
+        let φs := φ.applied (eqs.map (·.source))
+
+        setLeq leq Γ₁ (Ω₁ ∪ {φs})
+      ) ->
+      -- equalities and φ(t_) added
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
-        let φs := φ.applied (eqs.map (·.source))
         let φt := φ.applied (eqs.map (·.target))
 
-        setLeq leq (Γ₁ ∪ liftedEqs ∪ {φt}) (Ω₁ ∪ {φs})
+        setLeq leq (liftedEqs ∪ {φt}) Ω₁
       ) ->
       -- right preserved
       Γ₂ ⊆ Ω₂ ->
@@ -428,16 +434,18 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFormula (φ.applied (eqs.map (·.source))) ->
       isFormula (φ.applied (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
+      -- left preserved + equalities added
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
 
         setLeq leq (Γ₁ ∪ liftedEqs) Ω₁
       ) ->
+      -- right preserved except φ(s_) swapped with φ(t_)
       (
         let φs := φ.applied (eqs.map (·.source))
         let φt := φ.applied (eqs.map (·.target))
 
-        setLeq leq (Γ₂ ∪ {φt}) (Ω₂ ∪ {φs})
+        setLeq leq Γ₂ (Ω₂ ∪ {φs}) ∧ ordContains leq φt Ω₂
       ) ->
       ProofTree leq Ω₁ Ω₂
 
