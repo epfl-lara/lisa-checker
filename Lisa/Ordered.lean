@@ -64,7 +64,7 @@ def SubstPair.liftEq (σ : SubstPair) : Expr :=
 
         vars.foldr Expr.forall_ baseEq
 
-namespace Standard
+namespace Ordered
 
 open Expr
 
@@ -317,4 +317,4 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ProofTree leq Γ Δ ->
       ProofTree leq (Γ.image (subst σ)) (Δ.image (subst σ))
 
-end Standard
+end Ordered

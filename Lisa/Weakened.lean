@@ -1,5 +1,5 @@
 import Lisa.Syntax
-import Lisa.Standard
+import Lisa.Ordered
 
 /-
   This module defined the order-weakened λFOL proof system as used by the Lisa

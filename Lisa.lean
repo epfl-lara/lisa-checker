@@ -2,6 +2,6 @@
 -- Import modules here that should be built as part of the library.
 import Lisa.Basic
 import Lisa.Syntax
-import Lisa.Standard
+import Lisa.Ordered
 import Lisa.Weakened
-import Lisa.Bijection
+import Lisa.OrderedWeakened
