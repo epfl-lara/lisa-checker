@@ -6,4 +6,4 @@ import Lisa.Ordered
 import Lisa.Standard
 import Lisa.Weakened
 import Lisa.OrderedWeakened
-import Lisa.Bijection
+import Lisa.StandardOrdered

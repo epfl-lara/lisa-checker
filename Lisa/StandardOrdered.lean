@@ -4,7 +4,7 @@ import Lisa.Ordered
 open Lisa
 open Expr
 
-namespace Bijection
+namespace StandardOrdered
 
 def LeqContainedInStandard (leq : Order) : Prop :=
   ∀ {α β : Expr}, leq α β ->
@@ -228,4 +228,4 @@ theorem standard_eq_ordered_of_compatible (leq : Order) (Γ Δ : Finset Expr)
     Nonempty (Ordered.ProofTree leq Γ Δ) := by
   exact standard_eq_ordered leq Γ Δ hcompat.reflexive hcompat.closed
 
-end Bijection
+end StandardOrdered
