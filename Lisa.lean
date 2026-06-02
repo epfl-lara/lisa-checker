@@ -3,5 +3,6 @@
 import Lisa.Basic
 import Lisa.Syntax
 import Lisa.Ordered
+import Lisa.Standard
 import Lisa.Weakened
 import Lisa.OrderedWeakened
