@@ -310,7 +310,7 @@ private def weakenRightAndPrem {leq : Order} (href : Reflexive leq) (hneg : NegI
       (setLeq_of_subset href hpreserved.1)
       (setLeq_to_insert_of_sdiff href hpreserved.2))
 
-private def foldLeftOrStandard {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+private def foldLeftOrOrdered {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
     {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
     (acc : Expr) (hacc : isFormula acc)
     (pfacc : Ordered.ProofTree leq (insert acc Ω₁) Ω₂)
@@ -351,7 +351,7 @@ private def foldLeftOrStandard {leq : Order} (href : Reflexive leq) (hneg : NegI
             (setLeq_union_self href Ω₂))
       by
         simpa [foldOrFrom] using
-          foldLeftOrStandard href hneg hΩ₁ hΩ₂
+          foldLeftOrOrdered href hneg hΩ₁ hΩ₂
             (or acc prem.val) (isFormula_or hacc hpremSorted.2.2)
             combined rest'
             (by
@@ -364,7 +364,7 @@ private def foldLeftOrStandard {leq : Order} (href : Reflexive leq) (hneg : NegI
               intro q hq
               exact hpreservedRest q (by simp [hq]))
 
-private def foldRightAndStandard {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
+private def foldRightAndOrdered {leq : Order} (href : Reflexive leq) (hneg : NegInvariant leq)
     {Ω₁ Ω₂ : Finset Expr} (hΩ₁ : isFSet Ω₁) (hΩ₂ : isFSet Ω₂)
     (acc : Expr) (hacc : isFormula acc)
     (pfacc : Ordered.ProofTree leq Ω₁ (insert acc Ω₂))
@@ -405,7 +405,7 @@ private def foldRightAndStandard {leq : Order} (href : Reflexive leq) (hneg : Ne
             (setLeq_insert_union_self_to_insert href Ω₂ (and acc prem.val)))
       by
         simpa [foldAndFrom] using
-          foldRightAndStandard href hneg hΩ₁ hΩ₂
+          foldRightAndOrdered href hneg hΩ₁ hΩ₂
             (and acc prem.val) (isFormula_and hacc hpremSorted.2.2)
             combined rest'
             (by
@@ -418,13 +418,13 @@ private def foldRightAndStandard {leq : Order} (href : Reflexive leq) (hneg : Ne
               intro q hq
               exact hpreservedRest q (by simp [hq]))
 
-def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
+def orderedToWeakened {leq Γ Δ} (href : Reflexive leq) :
     Ordered.ProofTree leq Γ Δ ->
     Weakened.ProofTree leq Γ Δ
   | .restate hΓ hΔ hΓ' hΔ' pf hle₁ hle₂ =>
-      .restate hΓ hΔ hΓ' hΔ' (fwdEmbed href pf) hle₁ hle₂
+      .restate hΓ hΔ hΓ' hΔ' (orderedToWeakened href pf) hle₁ hle₂
   | .weakening hΓ hΔ hΓ' hΔ' pf hle =>
-      .weakening hΓ hΔ hΓ' hΔ' (fwdEmbed href pf) hle
+      .weakening hΓ hΔ hΓ' hΔ' (orderedToWeakened href pf) hle
   | .hypothesis φ hφ =>
       .hypothesis φ
         (isFSet_insert hφ (show isFSet (∅ : Finset Expr) from by
@@ -439,9 +439,9 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .cut φ hΓ hΔ hΩ hΞ hφ pf₁ pf₂ =>
       Weakened.ProofTree.cut φ
         hΓ (isFSet_insert hφ hΔ)
-        (fwdEmbed href pf₁)
+        (orderedToWeakened href pf₁)
         (isFSet_insert hφ hΩ) hΞ
-        (fwdEmbed href pf₂)
+        (orderedToWeakened href pf₂)
         (isFSet_union hΓ hΩ) (isFSet_union hΔ hΞ)
         hφ
         (by
@@ -469,7 +469,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftAnd φ ψ hΓ hΔ hφ hψ pf =>
       Weakened.ProofTree.leftAnd φ ψ
         (isFSet_insert hφ (isFSet_insert hψ hΓ)) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_insert (isFormula_and hφ hψ) hΓ) hΔ
         hφ hψ
         (by
@@ -512,11 +512,11 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
           let p₂ : AnnotatedSequent Expr := { pre := insert ψ Ω₁, post := Ξ₁, val := ψ }
           by_cases hp₁ : prem = p₁
           · subst prem
-            exact fwdEmbed href pf₁
+            exact orderedToWeakened href pf₁
           · have hp₂ : prem = p₂ := by
               simpa [prems, p₁, p₂, hp₁] using hprem
             subst prem
-            exact fwdEmbed href pf₂)
+            exact orderedToWeakened href pf₂)
         (by
           intro prem hprem
           simp [prems] at hprem
@@ -547,9 +547,9 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftImp φ ψ hΓ hΔ hΩ hΞ hφ hψ pf₁ pf₂ =>
       Weakened.ProofTree.leftImp φ ψ
         hΓ (isFSet_insert hφ hΔ)
-        (fwdEmbed href pf₁)
+        (orderedToWeakened href pf₁)
         (isFSet_insert hψ hΩ) hΞ
-        (fwdEmbed href pf₂)
+        (orderedToWeakened href pf₂)
         (isFSet_insert (isFormula_imp hφ hψ) (isFSet_union hΓ hΩ)) (isFSet_union hΔ hΞ)
         hφ hψ
         (by
@@ -581,7 +581,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
         (isFSet_insert (isFormula_imp hφ hψ)
           (isFSet_insert (isFormula_imp hψ hφ) hΓ))
         hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_insert (isFormula_iff hφ hψ) hΓ) hΔ
         hφ hψ
         (by
@@ -603,7 +603,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftNot φ hΓ hΔ hφ pf =>
       Weakened.ProofTree.leftNot φ
         hΓ (isFSet_insert hφ hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_insert (isFormula_neg hφ) hΓ) hΔ
         hφ
         (by
@@ -622,7 +622,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftForall x φ t hΓ hΔ hx hφ ht pf =>
       Weakened.ProofTree.leftForall x φ t
         (isFSet_insert (isFormula_substOne hx ht hφ) hΓ) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_insert (isFormula_forall hx hφ) hΓ) hΔ
         hx hφ ht
         (by
@@ -641,7 +641,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftExists x φ hΓ hΔ hx hφ pf hfree =>
       Weakened.ProofTree.leftExists x φ
         (isFSet_insert hφ hΓ) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_insert (isFormula_exists hx hφ) hΓ) hΔ
         hx hφ
         (by
@@ -682,11 +682,11 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
           let p₂ : AnnotatedSequent Expr := { pre := Ω₁, post := insert ψ Ξ₁, val := ψ }
           by_cases hp₁ : prem = p₁
           · subst prem
-            exact fwdEmbed href pf₁
+            exact orderedToWeakened href pf₁
           · have hp₂ : prem = p₂ := by
               simpa [prems, p₁, p₂, hp₁] using hprem
             subst prem
-            exact fwdEmbed href pf₂)
+            exact orderedToWeakened href pf₂)
         (by
           intro prem hprem
           simp [prems] at hprem
@@ -717,7 +717,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightOr φ ψ hΓ hΔ hφ hψ pf =>
       Weakened.ProofTree.rightOr φ ψ
         hΓ (isFSet_insert hφ (isFSet_insert hψ hΔ))
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_or hφ hψ) hΔ)
         hφ hψ
         (by
@@ -739,7 +739,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightImp φ ψ hΓ hΔ hφ hψ pf =>
       Weakened.ProofTree.rightImp φ ψ
         (isFSet_insert hφ hΓ) (isFSet_insert hψ hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_imp hφ hψ) hΔ)
         hφ hψ
         (by
@@ -763,9 +763,9 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightIff φ ψ hΓ hΔ hΩ hΞ hφ hψ pf₁ pf₂ =>
       Weakened.ProofTree.rightIff φ ψ
         hΓ (isFSet_insert (isFormula_imp hφ hψ) hΔ)
-        (fwdEmbed href pf₁)
+        (orderedToWeakened href pf₁)
         hΩ (isFSet_insert (isFormula_imp hψ hφ) hΞ)
-        (fwdEmbed href pf₂)
+        (orderedToWeakened href pf₂)
         (isFSet_union hΓ hΩ) (isFSet_insert (isFormula_iff hφ hψ) (isFSet_union hΔ hΞ))
         hφ hψ
         (by
@@ -795,7 +795,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightNot φ hΓ hΔ hφ pf =>
       Weakened.ProofTree.rightNot φ
         (isFSet_insert hφ hΓ) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_neg hφ) hΔ)
         hφ
         (by
@@ -814,7 +814,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightForall x φ hΓ hΔ hx hφ pf hfree =>
       Weakened.ProofTree.rightForall x φ
         hΓ (isFSet_insert hφ hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_forall hx hφ) hΔ)
         hx hφ
         (by
@@ -838,7 +838,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightExists x φ t hΓ hΔ hx hφ ht pf =>
       Weakened.ProofTree.rightExists x φ t
         hΓ (isFSet_insert (isFormula_substOne hx ht hφ) hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_exists hx hφ) hΔ)
         hx hφ ht
         (by
@@ -857,7 +857,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .rightEpsilon x φ t hΓ hΔ hx hφ ht pf =>
       Weakened.ProofTree.rightEpsilon x φ t
         hΓ (isFSet_insert (isFormula_substOne hx ht hφ) hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ (isFSet_insert (isFormula_substOne hx (isTerm_epsilon hx hφ) hφ) hΔ)
         hx hφ ht
         (by
@@ -876,7 +876,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .leftRefl t hΓ hΔ ht pf =>
       Weakened.ProofTree.leftRefl t
         (isFSet_insert (isFormula_eq ht ht) hΓ) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         hΓ hΔ
         ht
         (by
@@ -906,7 +906,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
       let φt := φ.applied (eqs.map (·.target))
       Weakened.ProofTree.leftSubstEq eqs φ
         (isFSet_insert hφs hΓ) hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_union hlift (isFSet_insert hφt hΓ)) hΔ
         heqs hφ hargs hφs hφt hlift
         (by
@@ -936,7 +936,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
       let φt := φ.applied (eqs.map (·.target))
       Weakened.ProofTree.rightSubstEq eqs φ
         hΓ (isFSet_insert hφs hΔ)
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (isFSet_union hlift hΓ) (isFSet_insert hφt hΔ)
         heqs hφ hargs hφs hφt hlift
         (by
@@ -959,7 +959,7 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
   | .instSchema σ hΓ hΔ hσ pf =>
       Weakened.ProofTree.instSchema σ
         hΓ hΔ
-        (fwdEmbed href pf)
+        (orderedToWeakened href pf)
         (by
           intro φ hφ
           simp only [Finset.mem_image] at hφ
@@ -973,13 +973,13 @@ def fwdEmbed {leq Γ Δ} (href : Reflexive leq) :
         hσ
         (sequentLeq_refl href _ _)
 
-def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
+def weakenedToOrdered  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
     Weakened.ProofTree leq Γ Δ ->
     Ordered.ProofTree leq Γ Δ
   | .restate hΓ hΔ hΓ' hΔ' pf hle₁ hle₂ =>
-      Ordered.ProofTree.restate hΓ hΔ hΓ' hΔ' (bwdEmbed href hneg pf) hle₁ hle₂
+      Ordered.ProofTree.restate hΓ hΔ hΓ' hΔ' (weakenedToOrdered href hneg pf) hle₁ hle₂
   | .weakening hΓ hΔ hΓ' hΔ' pf hle =>
-      Ordered.ProofTree.weakening hΓ hΔ hΓ' hΔ' (bwdEmbed href hneg pf) hle
+      Ordered.ProofTree.weakening hΓ hΔ hΓ' hΔ' (weakenedToOrdered href hneg pf) hle
   | .hypothesis α hΩ₁ hΩ₂ hα hleft hright =>
       Ordered.ProofTree.weakening
         (isFSet_insert hα isFSet_empty)
@@ -994,7 +994,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hα hΩ₂)
-          (bwdEmbed href hneg pf₁)
+          (weakenedToOrdered href hneg pf₁)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub₁)
             (setLeq_to_insert_of_sdiff href hrem₁))
@@ -1002,7 +1002,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΔ₁ hΔ₂
           (isFSet_insert hα hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf₂)
+          (weakenedToOrdered href hneg pf₂)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem₂)
             (setLeq_of_subset href hsub₂))
@@ -1018,7 +1018,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert hα (isFSet_insert hβ hΩ₁)) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert₂_of_sdiff href hrem)
             (setLeq_of_subset href hsub))
@@ -1042,15 +1042,15 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
             simpa using hpreserved prem (by simp)
           let firstPf : Ordered.ProofTree leq (insert prem.val Ω₁) Ω₂ :=
             weakenLeftOrPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
-              (bwdEmbed href hneg (hprems prem (by simp)))
+              (weakenedToOrdered href hneg (hprems prem (by simp)))
           let foldedPf : Ordered.ProofTree leq (insert (foldOrFrom prem.val rest) Ω₁) Ω₂ :=
-            foldLeftOrStandard href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
+            foldLeftOrOrdered href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
               (by
                 intro q hq
                 exact hsorted q (by simp [hq]))
               (by
                 intro q hq
-                exact bwdEmbed href hneg (hprems q (by simp [hq])))
+                exact weakenedToOrdered href hneg (hprems q (by simp [hq])))
               (by
                 intro q hq
                 exact hpreserved q (by simp [hq]))
@@ -1073,7 +1073,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hα hΩ₂)
-          (bwdEmbed href hneg pf₁)
+          (weakenedToOrdered href hneg pf₁)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub₁)
             (setLeq_to_insert_of_sdiff href hrem₁))
@@ -1081,7 +1081,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΔ₁ hΔ₂
           (isFSet_insert hβ hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf₂)
+          (weakenedToOrdered href hneg pf₂)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem₂)
             (setLeq_of_subset href hsub₂))
@@ -1099,7 +1099,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
           hΓ₁ hΓ₂
           (isFSet_insert (isFormula_imp hα hβ)
             (isFSet_insert (isFormula_imp hβ hα) hΩ₁)) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert₂_of_sdiff href hrem)
             (setLeq_of_subset href hsub))
@@ -1115,7 +1115,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hα hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub)
             (setLeq_to_insert_of_sdiff href hrem))
@@ -1131,7 +1131,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert (isFormula_substOne hx ht hα) hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem)
             (setLeq_of_subset href hsub))
@@ -1147,7 +1147,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert hα hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem)
             (setLeq_of_subset href hsub))
@@ -1172,15 +1172,15 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
             simpa using hpreserved prem (by simp)
           let firstPf : Ordered.ProofTree leq Ω₁ (insert prem.val Ω₂) :=
             weakenRightAndPrem href hneg hΩ₁ hΩ₂ prem hpremSorted hpremPreserved
-              (bwdEmbed href hneg (hprems prem (by simp)))
+              (weakenedToOrdered href hneg (hprems prem (by simp)))
           let foldedPf : Ordered.ProofTree leq Ω₁ (insert (foldAndFrom prem.val rest) Ω₂) :=
-            foldRightAndStandard href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
+            foldRightAndOrdered href hneg hΩ₁ hΩ₂ prem.val hpremSorted.2.2 firstPf rest
               (by
                 intro q hq
                 exact hsorted q (by simp [hq]))
               (by
                 intro q hq
-                exact bwdEmbed href hneg (hprems q (by simp [hq])))
+                exact weakenedToOrdered href hneg (hprems q (by simp [hq])))
               (by
                 intro q hq
                 exact hpreserved q (by simp [hq]))
@@ -1203,7 +1203,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hα (isFSet_insert hβ hΩ₂))
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub)
             (setLeq_to_insert₂_of_sdiff href hrem))
@@ -1219,7 +1219,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert hα hΩ₁) (isFSet_insert hβ hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem₁)
             (setLeq_to_insert_of_sdiff href hrem₂))
@@ -1235,7 +1235,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert (isFormula_imp hα hβ) hΩ₂)
-          (bwdEmbed href hneg pf₁)
+          (weakenedToOrdered href hneg pf₁)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub₁)
             (setLeq_to_insert_of_sdiff href hrem₁))
@@ -1243,7 +1243,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΔ₁ hΔ₂
           hΩ₁ (isFSet_insert (isFormula_imp hβ hα) hΩ₂)
-          (bwdEmbed href hneg pf₂)
+          (weakenedToOrdered href hneg pf₂)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub₂)
             (setLeq_to_insert_of_sdiff href hrem₂))
@@ -1260,7 +1260,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert hα hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem)
             (setLeq_of_subset href hsub))
@@ -1276,7 +1276,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hα hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub)
             (setLeq_to_insert_of_sdiff href hrem))
@@ -1293,7 +1293,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert (isFormula_substOne hx ht hα) hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub)
             (setLeq_to_insert_of_sdiff href hrem))
@@ -1309,7 +1309,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert (isFormula_substOne hx ht hα) hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_of_subset href hsub)
             (setLeq_to_insert_of_sdiff href hrem))
@@ -1325,7 +1325,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         (Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert (isFormula_eq ht ht) hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (setLeq_to_insert_of_sdiff href hrem)
             (setLeq_of_subset href hsub)))
@@ -1346,7 +1346,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           (isFSet_insert hφs hΩ₁) hΩ₂
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (by
               dsimp [φs] at hle ⊢
@@ -1385,7 +1385,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
         Ordered.ProofTree.weakening
           hΓ₁ hΓ₂
           hΩ₁ (isFSet_insert hφs hΩ₂)
-          (bwdEmbed href hneg pf)
+          (weakenedToOrdered href hneg pf)
           (sequentLeq_of_setLeq hneg
             (by
               dsimp [liftedEqs] at hleft
@@ -1432,7 +1432,7 @@ def bwdEmbed  {leq Γ Δ} (href : Reflexive leq) (hneg : NegInvariant leq) :
           rcases hφ with ⟨ψ, hψ, rfl⟩
           exact Subst.subst_preserves_hasSort hσ (hΓ₂ ψ hψ))
         hΩ₁ hΩ₂
-        (Ordered.ProofTree.instSchema σ hΓ₁ hΓ₂ hσ (bwdEmbed href hneg pf))
+        (Ordered.ProofTree.instSchema σ hΓ₁ hΓ₂ hσ (weakenedToOrdered href hneg pf))
         hle
 
 theorem ordered_eq_weakened (leq : Order) (Γ Δ : Finset Expr)
@@ -1440,5 +1440,5 @@ theorem ordered_eq_weakened (leq : Order) (Γ Δ : Finset Expr)
     Nonempty (Ordered.ProofTree leq Γ Δ) ↔
     Nonempty (Weakened.ProofTree leq Γ Δ) := by
   constructor <;> intro ⟨pf⟩
-  · exact ⟨fwdEmbed href pf⟩
-  · exact ⟨bwdEmbed href hneg.negInvariant pf⟩
+  · exact ⟨orderedToWeakened href pf⟩
+  · exact ⟨weakenedToOrdered href hneg.negInvariant pf⟩

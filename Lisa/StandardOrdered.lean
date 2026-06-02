@@ -29,13 +29,7 @@ structure OrderCompatibleWithStandard (leq : Order) where
 @[simp]
 private theorem isSame_refl {leq : Order} (href : Reflexive leq) (α : Expr) :
     isSame leq α α := by
-  exact ⟨href α, href α⟩
-
-private theorem setLeq_of_subset {leq : Order} (href : Reflexive leq)
-    {Γ Ω : Finset Expr} (hsub : Γ ⊆ Ω) :
-    setLeq leq Γ Ω := by
-  intro φ hφ
-  exact ⟨φ, hsub hφ, isSame_refl href φ⟩
+  constructor <;> exact href α
 
 private theorem sequentLeq_of_subset {leq : Order} (href : Reflexive leq)
     {Γ Δ Γ' Δ' : Finset Expr}
@@ -47,10 +41,13 @@ private theorem sequentLeq_of_subset {leq : Order} (href : Reflexive leq)
   rcases hφ with hφ | hφ
   · simp only [Finset.mem_image] at hφ
     rcases hφ with ⟨ψ, hψ, rfl⟩
-    exact ⟨neg ψ, by
-      simp only [Finset.mem_union, Finset.mem_image]
-      exact Or.inl ⟨ψ, hΓ hψ, rfl⟩, isSame_refl href (neg ψ)⟩
-  · exact ⟨φ, by simp [hΔ hφ], isSame_refl href φ⟩
+    refine ⟨neg ψ, ?_, ?_⟩
+    · simp only [Finset.mem_union, Finset.mem_image]
+      exact Or.inl ⟨ψ, hΓ hψ, rfl⟩
+    · exact isSame_refl href _
+  · refine ⟨φ, ?_, ?_⟩
+    · simp [hΔ hφ]
+    · exact isSame_refl href _
 
 def standardToOrdered {leq Γ Δ} (href : Reflexive leq) :
     Standard.ProofTree Γ Δ ->
@@ -226,6 +223,6 @@ theorem standard_eq_ordered_of_compatible (leq : Order) (Γ Δ : Finset Expr)
     (hcompat : OrderCompatibleWithStandard leq) :
     Nonempty (Standard.ProofTree Γ Δ) ↔
     Nonempty (Ordered.ProofTree leq Γ Δ) := by
-  exact standard_eq_ordered leq Γ Δ hcompat.reflexive hcompat.closed
+  simpa using standard_eq_ordered leq Γ Δ hcompat.reflexive hcompat.closed
 
 end StandardOrdered
