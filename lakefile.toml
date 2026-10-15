@@ -17,6 +17,7 @@ roots = [
   "Tests.OrthologicModel",
   "Tests.OrderModel",
   "Tests.Alignment",
+  "Tests.OrderSimulation",
 ]
 
 [[lean_exe]]
