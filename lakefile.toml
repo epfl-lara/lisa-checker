@@ -18,6 +18,8 @@ roots = [
   "Tests.OrderModel",
   "Tests.Alignment",
   "Tests.OrderSimulation",
+  "Tests.CheckerModel",
+  "Tests.Checker",
 ]
 
 [[lean_exe]]
