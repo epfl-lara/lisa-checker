@@ -26,6 +26,9 @@ roots = [
   "Tests.OrthologicConstraints",
   "Tests.OrthologicCore",
   "Tests.ContextualOrthologic",
+  "Tests.LambdaCore",
+  "Tests.NamedIntegration",
+  "Tests.NamedDecision",
 ]
 
 [[lean_exe]]
