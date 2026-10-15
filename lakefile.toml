@@ -1,6 +1,6 @@
 name = "lisa-checker"
 version = "0.1.0"
-defaultTargets = ["lisa-checker"]
+defaultTargets = ["lisa-checker", "Tests"]
 
 [[require]]
 name = "mathlib"
@@ -9,6 +9,37 @@ rev = "v4.29.1"
 
 [[lean_lib]]
 name = "Lisa"
+
+[[lean_lib]]
+name = "Tests"
+roots = [
+  "Tests.Alignment",
+  "Tests.StoredHash",
+  "Tests.OrderModel",
+  "Tests.CheckerModel",
+  "Tests.Checker",
+  "Tests.Binary",
+  "Tests.OrthologicModel",
+  "Tests.Orthologic",
+  "Tests.NormalForm",
+  "Tests.OrthologicMemo",
+  "Tests.ConversionOrder",
+  "Tests.ExpressionNormalize",
+  "Tests.OrthologicComplete",
+  "Tests.OrthologicConstraints",
+  "Tests.LambdaCore",
+  "Tests.OrthologicCore",
+  "Tests.ContextualOrthologic",
+  "Tests.NamedIntegration",
+  "Tests.NamedDecision",
+  "Tests.OrderRequirements",
+  "Tests.OrderSimulation",
+  "Tests.OrderedProjection",
+  "Tests.Combined",
+  "Tests.CombinedCached",
+  "Tests.CombinedCore",
+  "Tests.SerializedCorpus"
+]
 
 [[lean_exe]]
 name = "lisa-checker"

@@ -184,54 +184,42 @@ inductive ProofTree : (Γ Δ : Finset Expr) -> Type where
       isTerm t ->
       ProofTree ∅ {eq t t}
 
-  | leftSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | leftSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ ->
       isFSet Δ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
-      ProofTree (insert (φ.applied (eqs.map (·.source))) Γ) Δ ->
+      ProofTree (insert (φ.instantiate (eqs.map (·.source))) Γ) Δ ->
       ProofTree
         (
             let liftedEqs := eqs.map (·.liftEq) |>.toFinset
-            let φt := φ.applied (eqs.map (·.target))
+            let φt := φ.instantiate (eqs.map (·.target))
 
             liftedEqs ∪ insert φt Γ
         )
         Δ
 
-  | rightSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | rightSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ ->
       isFSet Δ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
-      ProofTree Γ (insert (φ.applied (eqs.map (·.source))) Δ) ->
+      ProofTree Γ (insert (φ.instantiate (eqs.map (·.source))) Δ) ->
       ProofTree
         (
             let liftedEqs := eqs.map (·.liftEq) |>.toFinset
 
             liftedEqs ∪ Γ
         )
-        (insert (φ.applied (eqs.map (·.target))) Δ)
+        (insert (φ.instantiate (eqs.map (·.target))) Δ)
 
   | instSchema {Γ Δ : Finset Expr} (σ : Subst) :
       isFSet Γ ->

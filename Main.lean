@@ -1,4 +1,3 @@
-import Lisa
+import Lisa.CLI
 
-def main : IO Unit :=
-  IO.println s!"Hello, {hello}!"
+def main (args : List String) : IO UInt32 := Lisa.CLI.main args

@@ -2,8 +2,8 @@ import Lisa.Syntax
 import Lisa.Ordered
 
 /-
-  This module defined the order-weakened λFOL proof system as used by the Lisa
-  proof checker.
+  Define Lisa's order-weakened λFOL rules, parameterized by a formula order
+  and an equivalence-preserving order reduction.
 -/
 
 open Lisa
@@ -20,9 +20,9 @@ namespace Weakened
 
 open Expr
 
-inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
+inductive ProofTree (leq : Order) [OrderReduction leq] : (Γ Δ : Finset Expr) -> Type where
   -- ordering rules
-  -- unchanged from the standard system
+  -- Compare the whole-sequent formulas.
   | restate {Γ Δ Γ' Δ' : Finset Expr} :
       isFSet Γ ->
       isFSet Δ ->
@@ -41,6 +41,12 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ProofTree leq Γ Δ ->
       sequentLeq leq Γ Δ Γ' Δ' ->
       ProofTree leq Γ' Δ'
+
+  /-- Introduce a sequent whose whole formula is order-equivalent to truth. -/
+  | restateTrue {Ω₁ Ω₂ : Finset Expr} :
+      isFSet Ω₁ → isFSet Ω₂ →
+      isSame leq (sequentToFormula Ω₁ Ω₂) top →
+      ProofTree leq Ω₁ Ω₂
 
   -- common rules
   | hypothesis {Ω₁ Ω₂ : Finset Expr} (α : Expr) :
@@ -61,11 +67,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
       -- nothing missing
-      Γ₁ ⊆ Ω₁ ->
-      Δ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₁ Ω₁ ->
+      reducedSubset leq Δ₂ Ω₂ ->
       -- only α removed
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
-      (∀ φ ∈ (Δ₁ \ Ω₁), isSame leq α φ) ->
+      containedExcept leq Γ₂ Ω₂ (α) ->
+      containedExcept leq Δ₁ Ω₁ (α) ->
       ProofTree leq Ω₁ Ω₂
 
   -- left structural rules
@@ -77,9 +83,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- nothing missing on the right
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       -- only α and β removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ ∨ isSame leq β φ) ->
+      containedExceptEither leq Γ₁ Ω₁ (α) (β) ->
       -- α ∧ β added on the left
       ordContains leq (and α β) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -103,9 +109,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ prem ∈ prems,
         let ⟨Γ, Δ, α⟩ := prem
         -- all rights preserved
-        Δ ⊆ Ω₂ ∧
+        reducedSubset leq Δ Ω₂ ∧
         -- all lefts preserved except α
-        ∀ φ ∈ (Γ \ Ω₁), isSame leq α φ
+        containedExcept leq Γ Ω₁ (α)
       ) ->
       -- ⋁ᵢ αᵢ added on the left
       (
@@ -130,12 +136,12 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- nothing unnecessary removed
-      Γ₁ ⊆ Ω₁ ->
-      Δ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₁ Ω₁ ->
+      reducedSubset leq Δ₂ Ω₂ ->
       -- only α removed from the first premise right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      containedExcept leq Γ₂ Ω₂ (α) ->
       -- only β removed from the second premise left
-      (∀ ψ ∈ (Δ₁ \ Ω₁), isSame leq β ψ) ->
+      containedExcept leq Δ₁ Ω₁ (β) ->
       -- α => β added on the left
       ordContains leq (imp α β) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -148,9 +154,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- nothing missing on the right
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       -- only implications removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (imp α β) φ ∨ isSame leq (imp β α) φ) ->
+      containedExceptEither leq Γ₁ Ω₁ ((imp α β)) ((imp β α)) ->
       -- α <=> β added on the left
       ordContains leq (iff α β) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -163,9 +169,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
       -- only α removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      containedExcept leq Γ₂ Ω₂ (α) ->
       -- ¬α added on the left
       ordContains leq (neg α) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -180,9 +186,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFormula α ->
       isTerm t ->
       -- nothing missing on the right
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       -- only α[t/x] removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (substOne x t α) φ) ->
+      containedExcept leq Γ₁ Ω₁ ((substOne x t α)) ->
       -- ∀x. α added on the left
       ordContains leq (forall_ x α) Ω₁ ->
       ProofTree leq Ω₁ Ω₂
@@ -196,9 +202,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       x.sort = ind ->
       isFormula α ->
       -- nothing missing on the right
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       -- only α removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ) ->
+      containedExcept leq Γ₁ Ω₁ (α) ->
       -- ∃x. α added on the left
       ordContains leq (exists_ x α) Ω₁ ->
       -- x not free in conclusion
@@ -226,9 +232,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       (∀ prem ∈ prems,
         let ⟨Γ, Δ, α⟩ := prem
         -- all lefts preserved
-        Γ ⊆ Ω₁ ∧
+        reducedSubset leq Γ Ω₁ ∧
         -- all rights preserved except α
-        ∀ φ ∈ (Δ \ Ω₂), isSame leq α φ
+        containedExcept leq Δ Ω₂ (α)
       ) ->
       -- ⋀ᵢ αᵢ added on the right
       (
@@ -250,9 +256,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
       -- only α and β removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ ∨ isSame leq β φ) ->
+      containedExceptEither leq Γ₂ Ω₂ (α) (β) ->
       -- α ∨ β added on the right
       ordContains leq (or α β) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
@@ -265,9 +271,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- only α removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ) ->
+      containedExcept leq Γ₁ Ω₁ (α) ->
       -- only β removed on the right
-      (∀ ψ ∈ (Γ₂ \ Ω₂), isSame leq β ψ) ->
+      containedExcept leq Γ₂ Ω₂ (β) ->
       -- α => β added on the right
       ordContains leq (imp α β) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
@@ -283,11 +289,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α -> isFormula β ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
-      Δ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
+      reducedSubset leq Δ₁ Ω₁ ->
       -- only implications removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq (imp α β) φ) ->
-      (∀ φ ∈ (Δ₂ \ Ω₂), isSame leq (imp β α) φ) ->
+      containedExcept leq Γ₂ Ω₂ ((imp α β)) ->
+      containedExcept leq Δ₂ Ω₂ ((imp β α)) ->
       -- α <=> β added on the right
       ordContains leq (iff α β) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
@@ -300,9 +306,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFSet Ω₁ -> isFSet Ω₂ ->
       isFormula α ->
       -- nothing missing on the right
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       -- only α removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq α φ) ->
+      containedExcept leq Γ₁ Ω₁ (α) ->
       -- ¬α added on the right
       ordContains leq (neg α) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
@@ -316,9 +322,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       x.sort = ind ->
       isFormula α ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
       -- only α removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq α φ) ->
+      containedExcept leq Γ₂ Ω₂ (α) ->
       -- ∀x. α added on the right
       ordContains leq (forall_ x α) Ω₂ ->
       -- x not free in conclusion
@@ -335,9 +341,9 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFormula α ->
       isTerm t ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
       -- only α[t/x] removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq (substOne x t α) φ) ->
+      containedExcept leq Γ₂ Ω₂ ((substOne x t α)) ->
       -- ∃x. α added on the right
       ordContains leq (exists_ x α) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
@@ -352,100 +358,90 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isFormula α ->
       isTerm t ->
       -- nothing missing on the left
-      Γ₁ ⊆ Ω₁ ->
+      reducedSubset leq Γ₁ Ω₁ ->
       -- only α[t/x] removed on the right
-      (∀ φ ∈ (Γ₂ \ Ω₂), isSame leq (substOne x t α) φ) ->
+      containedExcept leq Γ₂ Ω₂ ((substOne x t α)) ->
       -- ε instantiation added on the right
       ordContains leq (substOne x (epsilon_ (.lam x α)) α) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
 
   -- equality rules
 
-  | leftRefl {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (t : Expr) :
+  | leftRefl {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (s t : Expr) :
       -- premise
       isFSet Γ₁ -> isFSet Γ₂ ->
       ProofTree leq Γ₁ Γ₂ ->
       -- conclusion
       isFSet Ω₁ -> isFSet Ω₂ ->
       -- reflexive term
-      isTerm t ->
+      isTerm s -> isTerm t ->
+      isSame leq s t ->
       -- right preserved
-      Γ₂ ⊆ Ω₂ ->
-      -- only eq t t removed on the left
-      (∀ φ ∈ (Γ₁ \ Ω₁), isSame leq (eq t t) φ) ->
+      reducedSubset leq Γ₂ Ω₂ ->
+      -- only the reflexive equality removed on the left
+      containedExcept leq Γ₁ Ω₁ ((eq s t)) ->
       ProofTree leq Ω₁ Ω₂
 
-  | rightRefl {Ω₁ Ω₂ : Finset Expr} (t : Expr) :
+  | rightRefl {Ω₁ Ω₂ : Finset Expr} (s t : Expr) :
       isFSet Ω₁ -> isFSet Ω₂ ->
       -- reflexive term
-      isTerm t ->
-      -- eq t t added on the right
-      ordContains leq (eq t t) Ω₂ ->
+      isTerm s -> isTerm t ->
+      isSame leq s t ->
+      -- the reflexive equality added on the right
+      ordContains leq (eq s t) Ω₂ ->
       ProofTree leq Ω₁ Ω₂
 
-  | leftSubstEq {Γ₁ Γ₂ Ω₁ Ω₂: Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | leftSubstEq {Γ₁ Γ₂ Ω₁ Ω₂: Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ₁ -> isFSet Γ₂ ->
       ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
       -- arguments of φ match the sorts of the subst pairs
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- left preserved except φ(s_)
       (
-        let φs := φ.applied (eqs.map (·.source))
+        let φs := φ.instantiate (eqs.map (·.source))
 
-        setLeq leq Γ₁ (Ω₁ ∪ {φs})
+        containedExcept leq Γ₁ Ω₁ φs
       ) ->
       -- equalities and φ(t_) added
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
-        let φt := φ.applied (eqs.map (·.target))
+        let φt := φ.instantiate (eqs.map (·.target))
 
         setLeq leq (liftedEqs ∪ {φt}) Ω₁
       ) ->
       -- right preserved
-      Γ₂ ⊆ Ω₂ ->
+      reducedSubset leq Γ₂ Ω₂ ->
       ProofTree leq Ω₁ Ω₂
 
-  | rightSubstEq {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | rightSubstEq {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ₁ -> isFSet Γ₂ ->
       ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
       -- arguments of φ match the sorts of the subst pairs
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- left preserved + equalities added
       (
         let liftedEqs := eqs.map (·.liftEq) |>.toFinset
 
-        setLeq leq (Γ₁ ∪ liftedEqs) Ω₁
+        reducedSubset leq Γ₁ Ω₁ ∧ setLeq leq liftedEqs Ω₁
       ) ->
       -- right preserved except φ(s_) swapped with φ(t_)
       (
-        let φs := φ.applied (eqs.map (·.source))
-        let φt := φ.applied (eqs.map (·.target))
+        let φs := φ.instantiate (eqs.map (·.source))
+        let φt := φ.instantiate (eqs.map (·.target))
 
-        setLeq leq Γ₂ (Ω₂ ∪ {φs}) ∧ ordContains leq φt Ω₂
+        containedExcept leq Γ₂ Ω₂ φs ∧ ordContains leq φt Ω₂
       ) ->
       ProofTree leq Ω₁ Ω₂
 
@@ -454,12 +450,11 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       ProofTree leq Γ₁ Γ₂ ->
       isFSet Ω₁ -> isFSet Ω₂ ->
       Subst.wellSorted σ ->
-      -- the substituted sequent can be weakened
-      -- to the conclusion
+      -- Preserve each instantiated formula on its original side.
       (
         let Γ₁' := Γ₁.image (Subst.subst σ)
         let Γ₂' := Γ₂.image (Subst.subst σ)
 
-        sequentLeq leq Γ₁' Γ₂' Ω₁ Ω₂
+        setLeq leq Γ₁' Ω₁ ∧ setLeq leq Γ₂' Ω₂
       ) ->
       ProofTree leq Ω₁ Ω₂

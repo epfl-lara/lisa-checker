@@ -1,39 +1,6 @@
-import Lisa.Syntax
+import Lisa.Order
 
 open Lisa
-
-abbrev Order : Type := Expr -> Expr -> Prop
-
-@[simp]
-def isSame (leq : Order) (α β : Expr) : Prop :=
-  leq α β ∧ leq β α
-
-@[simp]
-def ordContains (leq : Order) (α : Expr) (Γ : Finset Expr) : Prop :=
-  ∃ β ∈ Γ, isSame leq α β
-
-@[simp]
-def setLeq (leq : Order) (s t : Finset Expr) : Prop :=
-  ∀ φ ∈ s, ∃ ψ ∈ t, isSame leq φ ψ
-
-def NegAntitone (leq : Order) : Prop :=
-  ∀ {α β : Expr}, leq α β -> leq (.neg β) (.neg α)
-
-def NegInvariant (leq : Order) : Prop :=
-  ∀ {α β : Expr}, isSame leq α β -> isSame leq (.neg α) (.neg β)
-
-/-- Antitone wrt `leq` implies negation invariance for `isSame leq` -/
-@[simp]
-lemma NegAntitone.negInvariant {leq : Order} (hneg : NegAntitone leq) :
-    NegInvariant leq := by
-  intro α β hsame
-  exact ⟨hneg hsame.2, hneg hsame.1⟩
-
-@[simp]
-def sequentLeq (leq : Order) (Γ Δ Γ' Δ' : Finset Expr) : Prop :=
-  let seq1 := (Γ.image Expr.neg) ∪ Δ
-  let seq2 := (Γ'.image Expr.neg) ∪ Δ'
-  setLeq leq seq1 seq2
 
 structure SubstPair where
     source : Expr
@@ -45,6 +12,7 @@ def SubstPair.wellSorted (σ : SubstPair) : Prop :=
 def SubstPair.sort (σ : SubstPair) : Option LSort :=
   σ.source.sort
 
+/-- Quantify pointwise equality for functions and equivalence for predicates. -/
 def SubstPair.liftEq (σ : SubstPair) : Expr :=
     match σ.sort with
     | none => -- malformed
@@ -52,7 +20,7 @@ def SubstPair.liftEq (σ : SubstPair) : Expr :=
     | some sort =>
         -- if the sort is a function type,
         -- make a universally quantified equality
-        let (args, _) := sort.splitArgs
+        let (args, result) := sort.splitArgs
         let allFree := σ.source.freeVars ∪ σ.target.freeVars
         let maxId := allFree.fold Nat.max 0 (·.id.idx)
         let vars := args.mapIdx fun i argSort =>
@@ -60,9 +28,27 @@ def SubstPair.liftEq (σ : SubstPair) : Expr :=
           SVar.mk ⟨"x", id⟩ argSort
         let appliedSource := σ.source.applied (vars.map Expr.var)
         let appliedTarget := σ.target.applied (vars.map Expr.var)
-        let baseEq := appliedSource.eq appliedTarget
+        let baseEq := if result = prop then appliedSource.iff appliedTarget
+          else appliedSource.eq appliedTarget
 
         vars.foldr Expr.forall_ baseEq
+
+/-- Represent a substitution context by parameters and a formula body. -/
+structure SubstContext where
+  params : List SVar
+  body : Expr
+
+def SubstContext.wellSorted (φ : SubstContext) : Prop :=
+  isFormula φ.body ∧ ∀ x ∈ φ.params, x.sort.isFunctional = true ∨ x.sort.isPredicate = true
+
+/-- Instantiate simultaneously; repeated parameters use their last replacement. -/
+def SubstContext.instantiate (φ : SubstContext) (args : List Expr) : Expr :=
+  let σ := (φ.params.zip args).foldl (fun σ (x, e) => σ.insert x e) (∅ : Subst)
+  σ.subst φ.body
+
+/-- Check substitution arity and parameter sorts. -/
+def SubstContext.fits (φ : SubstContext) (eqs : List SubstPair) : Prop :=
+  eqs.map (·.sort) = φ.params.map (fun x => some x.sort)
 
 namespace Ordered
 
@@ -255,52 +241,40 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
       isTerm t ->
       ProofTree leq ∅ {eq t t}
 
-  | leftSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | leftSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ ->
       isFSet Δ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
       -- arguments of φ match the sorts of the subst pairs
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- Γ, φ(s_) ⊢ Δ
-      ProofTree leq (insert (φ.applied (eqs.map (·.source))) Γ) Δ ->
+      ProofTree leq (insert (φ.instantiate (eqs.map (·.source))) Γ) Δ ->
       -- Γ, ∀x₁...xₙ. s₁(x_) = t₁(x_), ..., φ(t_) ⊢ Δ
       ProofTree leq
         (
             let liftedEqs := eqs.map (·.liftEq) |>.toFinset
-            let φt := φ.applied (eqs.map (·.target))
+            let φt := φ.instantiate (eqs.map (·.target))
 
             liftedEqs ∪ insert φt Γ
         )
         Δ
 
-  | rightSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : Expr) :
+  | rightSubstEq {Γ Δ : Finset Expr} (eqs : List SubstPair) (φ : SubstContext) :
       isFSet Γ ->
       isFSet Δ ->
       (∀ σ ∈ eqs, σ.wellSorted) ->
       φ.wellSorted ->
       -- arguments of φ match the sorts of the subst pairs
-      (
-        match φ.sort with
-        | none => False
-        | some sort =>
-            let (args, _) := sort.splitArgs
-            eqs.map (·.sort) = args.map some
-      ) ->
-      isFormula (φ.applied (eqs.map (·.source))) ->
-      isFormula (φ.applied (eqs.map (·.target))) ->
+      φ.fits eqs ->
+      isFormula (φ.instantiate (eqs.map (·.source))) ->
+      isFormula (φ.instantiate (eqs.map (·.target))) ->
       isFSet (eqs.map (·.liftEq) |>.toFinset) ->
       -- Γ ⊢ φ(s_), Δ
-      ProofTree leq Γ (insert (φ.applied (eqs.map (·.source))) Δ) ->
+      ProofTree leq Γ (insert (φ.instantiate (eqs.map (·.source))) Δ) ->
       -- ∀x₁...xₙ. s₁(x_) = t₁(x_), ..., Γ ⊢ φ(t_), Δ
       ProofTree leq
         (
@@ -308,7 +282,7 @@ inductive ProofTree (leq : Order) : (Γ Δ : Finset Expr) -> Type where
 
             liftedEqs ∪ Γ
         )
-        (insert (φ.applied (eqs.map (·.target))) Δ)
+        (insert (φ.instantiate (eqs.map (·.target))) Δ)
 
   | instSchema {Γ Δ : Finset Expr} (σ : Subst) :
       isFSet Γ ->
