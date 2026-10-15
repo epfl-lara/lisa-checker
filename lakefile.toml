@@ -14,6 +14,7 @@ name = "Lisa"
 name = "Tests"
 roots = [
   "Tests.StoredHash",
+  "Tests.OrthologicModel",
 ]
 
 [[lean_exe]]
