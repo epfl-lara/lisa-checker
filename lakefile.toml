@@ -20,6 +20,12 @@ roots = [
   "Tests.OrderSimulation",
   "Tests.CheckerModel",
   "Tests.Checker",
+  "Tests.OrthologicMemo",
+  "Tests.NormalForm",
+  "Tests.OrthologicComplete",
+  "Tests.OrthologicConstraints",
+  "Tests.OrthologicCore",
+  "Tests.ContextualOrthologic",
 ]
 
 [[lean_exe]]
