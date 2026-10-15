@@ -7,13 +7,21 @@ namespace Lisa
 structure Identifier where
   name : String
   idx : Nat := 0
-deriving DecidableEq, Repr, Inhabited
+deriving DecidableEq, Repr, Inhabited, Hashable
 
 inductive LSort where
   | ind : LSort
   | prop : LSort
   | arrow : LSort -> LSort -> LSort
+with
+  /-- Store the structural hash when constructing a sort. -/
+  @[computed_field] cachedHash : LSort → UInt64
+    | .ind => 0
+    | .prop => 1
+    | .arrow a b => mixHash (mixHash 2 a.cachedHash) b.cachedHash
 deriving DecidableEq, Repr, Inhabited
+
+instance : Hashable LSort := ⟨LSort.cachedHash⟩
 
 abbrev prop : LSort := .prop
 abbrev ind : LSort := .ind
@@ -51,11 +59,11 @@ end LSort
 structure SVar where
   id : Identifier
   sort : LSort
-deriving DecidableEq, Repr, Inhabited
+deriving DecidableEq, Repr, Inhabited, Hashable
 
 structure SConst where
   id : Identifier
   sort : LSort
-deriving DecidableEq, Repr, Inhabited
+deriving DecidableEq, Repr, Inhabited, Hashable
 
 end Lisa

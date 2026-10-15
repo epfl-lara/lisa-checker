@@ -9,7 +9,16 @@ inductive Expr where
   | const : SConst -> Expr
   | app : Expr -> Expr -> Expr
   | lam : SVar -> Expr -> Expr
+with
+  /-- Store the structural hash when constructing an expression. -/
+  @[computed_field] cachedHash : Expr → UInt64
+    | .var x => mixHash 0 (hash x)
+    | .const c => mixHash 1 (hash c)
+    | .app f a => mixHash (mixHash 2 f.cachedHash) a.cachedHash
+    | .lam x body => mixHash (mixHash 3 (hash x)) body.cachedHash
 deriving DecidableEq, Repr, Inhabited
+
+instance : Hashable Expr := ⟨Expr.cachedHash⟩
 
 namespace Expr
 
