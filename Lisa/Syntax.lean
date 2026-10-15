@@ -1,6 +1,6 @@
 import Lisa.Sort
-import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Union
+import Mathlib.Data.Finset.Fold
 
 namespace Lisa
 
@@ -66,11 +66,21 @@ def isTerm (e : Expr) : Prop := e.hasSort ind
 @[simp]
 def isFSet (Γ : Finset Expr) : Prop := ∀ φ ∈ Γ, isFormula φ
 
-/-- Given a set of used identifiers and a base identifier, generate a fresh
-identifier with same name as base. -/
+/-- Increment the largest used index with the base name, including the base index. -/
 def freshId (used : Finset Identifier) (base : Identifier) : Identifier :=
-  let maxIdx := used.fold Nat.max 0 (·.idx)
+  let maxIdx := (used.filter (·.name = base.name)).fold Nat.max base.idx (·.idx)
   { base with idx := maxIdx + 1 }
+
+theorem freshId_not_mem (used : Finset Identifier) (base : Identifier) :
+    freshId used base ∉ used := by
+  intro h
+  have hmem : freshId used base ∈ used.filter (·.name = base.name) :=
+    Finset.mem_filter.mpr ⟨h, rfl⟩
+  have hbound : (freshId used base).idx ≤
+      (used.filter (·.name = base.name)).fold Nat.max base.idx (·.idx) := by
+    rw [Finset.le_fold_max]
+    exact Or.inr ⟨_, hmem, le_rfl⟩
+  exact Nat.not_succ_le_self _ hbound
 
 abbrev Subst : Type := Lean.AssocList SVar Expr
 
@@ -78,6 +88,22 @@ namespace Subst
 
 def freeVars (σ : Subst) : Finset SVar :=
   σ.toList.foldl (fun acc (x, e) => acc ∪ {x} ∪ e.freeVars) ∅
+
+/-- Collect free variables of replacement expressions. -/
+def rangeFreeVars : Subst → Finset SVar
+  | .nil => ∅
+  | .cons _ e rest => e.freeVars ∪ rangeFreeVars rest
+
+/-- Collect the variables replaced by a substitution. -/
+def domain : Subst → Finset SVar
+  | .nil => ∅
+  | .cons x _ rest => insert x (domain rest)
+
+/-- Remove a variable from the substitution, including shadowed entries. -/
+def without (x : SVar) : Subst → Subst
+  | .nil => .nil
+  | .cons y e rest =>
+      if y = x then without x rest else .cons y e (without x rest)
 
 @[simp]
 def wellSorted : Subst -> Prop
@@ -93,14 +119,14 @@ def subst (σ : Subst) : Expr -> Expr
   | .const c => .const c
   | .app f a => .app (subst σ f) (subst σ a)
   | .lam x body =>
-      let fv := σ.freeVars
-      let x' :=
-        if x ∈ fv then
-          let id := freshId (fv.image (·.id)) x.id
-          { x with id }
-        else
-          x
-      .lam x' (subst (σ.insert x (.var x')) body)
+      let fv := σ.rangeFreeVars
+      let remaining := σ.without x
+      if x ∈ fv then
+        let taken := fv ∪ body.freeVars ∪ σ.domain
+        let x' := { x with id := freshId (taken.image (·.id)) x.id }
+        .lam x' (subst (remaining.insert x (.var x')) body)
+      else
+        .lam x (subst remaining body)
 
 @[simp]
 theorem wellSorted_replace {σ : Subst} {x : SVar} {e : Expr}
@@ -130,6 +156,18 @@ theorem wellSorted_insert {σ : Subst} {x : SVar} {e : Expr}
   · simp [hcontains, Lean.AssocList.insertNew, hσ]
     exact he
 
+@[simp]
+theorem wellSorted_without {σ : Subst} (hσ : wellSorted σ) (x : SVar) :
+    wellSorted (σ.without x) := by
+  induction σ with
+  | nil => trivial
+  | cons y e rest ih =>
+      simp only [wellSorted] at hσ
+      simp only [without]
+      cases hσ
+      split <;> simp [*]
+      assumption
+
 theorem subst_preserves_sort {σ : Subst} (hσ : wellSorted σ) :
     ∀ e, (subst σ e).sort = e.sort := by
   intro e
@@ -138,47 +176,42 @@ theorem subst_preserves_sort {σ : Subst} (hσ : wellSorted σ) :
       simp [subst]
       cases hfind : σ.find? x with
       | none =>
+          -- x ∉ σ
           simp
       | some v =>
           induction σ with
           | nil =>
+              -- contradiction, empty subst
               simp [Lean.AssocList.find?] at hfind
           | cons y w rest ih =>
+              -- x ∈ σ
               simp [Lean.AssocList.find?] at hfind hσ
-              by_cases hyx : (y == x) = true
-              · simp [hyx] at hfind
-                cases hfind
+              by_cases hyx : y == x
+              · -- x at head
+                simp [hyx] at hfind
                 have hyxEq : y = x := beq_iff_eq.mp hyx
-                subst hyxEq
+                subst hfind hyxEq
                 exact hσ.1
-              · have hyxFalse : (y == x) = false := by
-                  cases h : y == x <;> simp [h] at hyx ⊢
-                simp [hyxFalse] at hfind
-                exact ih hσ.2 hfind
+              · -- x in tail
+                simp [hyx] at hfind
+                simp [*]
   | const c =>
       simp [subst]
   | app f a ihf iha =>
       simp [subst, ihf hσ, iha hσ]
   | lam x body ih =>
-      dsimp [subst, Expr.sort]
-      set x' :=
-        if x ∈ σ.freeVars then
-          { id := freshId (Finset.image (fun x => x.id) σ.freeVars) x.id, sort := x.sort }
-        else
-          x
-      have hxsort : x'.sort = x.sort := by
-        dsimp [x']
-        split <;> rfl
-      have hvar : (Expr.var x').hasSort x.sort := by
-        simp [Expr.hasSort, hxsort]
-      rw [ih (wellSorted_insert hσ hvar)]
-      cases body.sort <;> simp [hxsort]
+      simp only [subst]
+      split
+      · simp only [Expr.sort]
+        rw [ih (wellSorted_insert (wellSorted_without hσ x) (by rfl))]
+      · simp only [Expr.sort]
+        rw [ih (wellSorted_without hσ x)]
 
 theorem subst_preserves_hasSort {σ : Subst} (hσ : wellSorted σ)
     {e : Expr} {s : LSort} (h : e.hasSort s) :
     (subst σ e).hasSort s := by
-  rw [Expr.hasSort, subst_preserves_sort hσ e]
-  exact h
+  simp [Expr.hasSort, subst_preserves_sort, *]
+  assumption
 
 end Subst
 
