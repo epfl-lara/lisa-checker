@@ -13,22 +13,32 @@ name = "Lisa"
 [[lean_lib]]
 name = "Tests"
 roots = [
-  "Tests.StoredHash",
-  "Tests.OrthologicModel",
-  "Tests.OrderModel",
   "Tests.Alignment",
-  "Tests.OrderSimulation",
+  "Tests.StoredHash",
+  "Tests.OrderModel",
   "Tests.CheckerModel",
   "Tests.Checker",
-  "Tests.OrthologicMemo",
+  "Tests.Binary",
+  "Tests.OrthologicModel",
+  "Tests.Orthologic",
   "Tests.NormalForm",
+  "Tests.OrthologicMemo",
+  "Tests.ConversionOrder",
+  "Tests.ExpressionNormalize",
   "Tests.OrthologicComplete",
   "Tests.OrthologicConstraints",
+  "Tests.LambdaCore",
   "Tests.OrthologicCore",
   "Tests.ContextualOrthologic",
-  "Tests.LambdaCore",
   "Tests.NamedIntegration",
   "Tests.NamedDecision",
+  "Tests.OrderRequirements",
+  "Tests.OrderSimulation",
+  "Tests.OrderedProjection",
+  "Tests.Combined",
+  "Tests.CombinedCached",
+  "Tests.CombinedCore",
+  "Tests.SerializedCorpus"
 ]
 
 [[lean_exe]]
