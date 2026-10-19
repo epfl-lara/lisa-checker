@@ -1,0 +1,370 @@
+% !TEX root = ../main.tex
+We present a new formal theory called \lamfol. \lamfol is a purely logical extension of first-order logic, which allows us to study its proof theory and relations with FOL, HOL and their variants.
+The achievement of \lamfol is to provide a natural syntax for higher-order expressions, such as in the examples above, while fundamentally remaining first-order and not increasing the complexity of the logical kernel. In fact, it even reduces the complexity because terms and formulas are now treated uniformly.
+
+\begin{definition}[\lamfol]
+    \label{def:lamfol}
+\textit{Types}, denoted by $\sigma, \tau$, are \textit{Terms}, \textit{Formulas} and recursively built function types:
+\begin{align*}
+    \tau := \Ind \mid \Prop \mid \tau_1 \to \tau_2 
+\end{align*}
+
+The set of typed expressions is the same as that of simply typed $\lambda$-calculus, with four constructors: variable symbols, constant symbols, abstraction and application:
+\begin{align*}
+    &(\E : \tau) := \\
+    & \mid x_\tau: \tau \\
+    & \mid c: \tau \\
+    & \mid (f: \tau_1 \to \tau_2) (e: \tau_1) : \tau_2 \\
+    & \mid \abs{x: \tau_1}{(e: \tau_2)} : \tau_1 \to \tau_2
+\end{align*}
+Variables $x_\tau$ range over a countably infinite set and $c$'s are constant symbols.
+Note that the type of variables is always explicitly attached to the variable symbol, so that any expression always has a single type, independently of any context.
+
+Constant symbols of \lamfol are the usual connectives of first-order logic:
+\begin{align*}
+    \neg & : & \Prop \to \Prop \\
+    \land & : & \Prop \to \Prop \to \Prop \\
+    \lor & : & \Prop \to \Prop \to \Prop \\
+    \forall, \exists & : & (\Ind \to \Prop) \to \Prop \\
+    \equiv & : & \Ind \to \Ind \to \Prop \\
+    f_1, f_2, ... & : & \Ind \to ... \to \Ind \to \Ind \\
+    P_1, P_2, ... & : & \Ind \to ... \to \Ind \to \Prop
+\end{align*}
+where $\equiv$ is the symbol for equality, $f_1, f_2, ...$ stand for the function symbols of the underlying first-order theory and $P_1, P_2, ...$ for the predicate symbols. For example in Peano arithmetic, we would have three function symbols:
+\begin{align*}
+    0 & : \Ind \\
+    S & : \Ind \to \Ind \\
+    + & : \Ind \to \Ind \to \Ind
+\end{align*}
+There is a natural embedding of pure FOL terms and formulas in \lamfol given by the injection $\tolam{\cdot}$:
+\begin{align*}
+    \tolam{x_{\Ind}} & := x: \Ind \\
+    \tolam{c} & := c: \Ind \\
+    \tolam{f(t_1, \ldots, t_n)} & := f (\tolam{t_1})\app ...\app (\tolam{t_n}) \\
+    \tolam{P(t_1, \ldots, t_n)} & := P (\tolam{t_1})\app ...\app (\tolam{t_n}) \\
+    \tolam{\neg \phi} & := \neg \tolam{\phi} \\
+    \tolam{\phi_1 \land \phi_2} & := \land\app \tolam{\phi_1}\app \tolam{\phi_2} \\
+    \tolam{\phi_1 \lor \phi_2} & := \lor\app \tolam{\phi_1}\app \tolam{\phi_2} \\
+    \tolam{\forall x. \phi} & := \forall (\abs{x: \Ind}{\tolam{\phi}}) \\
+    \tolam{\exists x. \phi} & := \exists (\abs{x: \Ind}{\tolam{\phi}}) \\
+    \tolam{\phi_1 \equiv \phi_2} & := \equiv\app \tolam{\phi_1}\app \tolam{\phi_2}
+\end{align*}
+We say of $\lambda$-expressions in the range of $\tolam{\cdot}$ that they are \textit{pure first-order expressions}. We often use the syntax of pure FOL for binders and infix conjunction and disjunction to describe the corresponding \lamfol expressions.
+\end{definition}
+
+\begin{definition}[Terms, formulas and order]
+Expressions of type \Prop are called \textit{formulas}. Expressions of type \Ind are called \textit{terms}.
+Expressions of type $\Ind \rightarrow \Ind \rightarrow ... \rightarrow \Ind$ are called \textit{functionals}.
+Expressions of type $\Ind \rightarrow \Ind \rightarrow ... \rightarrow \Prop$ are called \textit{predicates}.
+Formulas and terms are said to be of \textit{first-order}. Predicate and function symbols are said to be of \textit{second order}. Generally, define the order of a type as:
+\begin{align*}
+    \ord(\Ind) & := 1 \\
+    \ord(\Prop) & := 1 \\
+    \ord(\tau_1 \to \tau_2) & := \max(\ord(\tau_1)+1, \ord(\tau_2))
+\end{align*}
+If $e:\tau$ is an expression, $\ord(e) := \ord(\tau)$. For example, $\ord(\forall) = \ord(\exists) = 3$ and $\ord(\neg) = \ord(\land) = \ord(\lor) = \ord(\equiv) = 2$. For $f$ a function symbol, $\ord(f) = 1$ if $f$ has arity 0 (i.e. it is a true constant) and $\ord(f) = 2$ otherwise. Hence, in Peano arithmetic, $\ord(0) = 1$, $\ord(S) = 2$ and $\ord(+) = 2$.
+\end{definition}
+
+Free, bound and fresh variables, $\alpha$, $\beta$ and $\eta$-equivalence, and capture-avoiding substitution (denoted denoted $t[x := s]$ or $\phi[x := s]$) are defined as usual in the simply typed $\lambda$-calculus. Unless otherwise specified, we always consider terms and formulas up to alpha-equivalence.
+
+\begin{definition}[Canonical form]
+  An expression is in \textit{canonical form} (or \textit{$\beta$-normal $\eta$-long form}) if it is of the form
+  \[ \abs{(x_1: \tau_1)}{\ldots \abs{(x_n: \tau_n)}{h\app e_1\app \ldots\app e_k}} \] where $h$ is a variable or constant symbol, $h\app e_1\app \ldots\app e_k$ has type $\Ind$ or $\Prop$, and each $e_i$ is in canonical form. 
+Every expression $e$ is $\beta\eta$-equivalent to a unique expression in canonical form, called the canonical form of $e$, and two expressions are $\beta\eta$-equivalent if and only if their canonical forms are equal (up to $\alpha$-equivalence)~\cite{barendregtLambdaCalculusTypes2013}.
+\end{definition}
+
+
+
+\begin{definition}[Mathematical theory]
+  A mathematical theory $\TT$ is a pair $(\Sigma, A)$ where $\Sigma$ is a FOL signature and $A$ is a set of FOL formulas over $\Sigma$, called the \textit{axioms} of $\TT$.
+\end{definition}
+
+We now define a proof system for \lamfol, adapting the usual sequent calculus, which Lisa uses. We define three increasingly permissive systems which we use as intermediate systems to prove full conservativity. The first, \SClamA, is in fact exactly the usual sequent calculus for the pure FOL fragment.
+\begin{definition}[Sequent calculus for \lamfol (\SClamA)]
+  \label{def:SClamA}
+  A \textit{sequent} is a pair $(\Gamma, \Delta)$ where $\Gamma$ and $\Delta$ are finite sets of formulas, denoted $\Gamma \vdash \Delta$. A proof in \SClamA is a finite rooted tree built from the deduction rules shown in \autoref{fig:FOLSCRules}. Additionally, every formula in the proof is considered up to $\abe$-equivalence.
+  We say that the proof proves the sequent at its root.
+\end{definition}
+
+\begin{figure}
+    \begin{center}
+    \begin{tabular}{l l}
+        \AxiomC{}
+        \RightLabel{\Hyp}
+        \UnaryInfC{$\Gamma, \phi \vdash \phi, \Delta$}
+        \DisplayProof
+        &
+        \AxiomC{}
+        \RightLabel{\AxiomR \. \text{(if $\phi \in A$)}}
+        \UnaryInfC{$ \vdash \phi$}
+        \DisplayProof
+        \\[4ex]
+        \multicolumn{2}{c}{
+          \AxiomC{$\Gamma \vdash \phi, \Delta$}
+          \AxiomC{$\Sigma, \phi \vdash \Pi$}
+          \RightLabel{\Cut}
+          \BinaryInfC{$\Gamma, \Sigma \vdash \Delta, \Pi$}
+          \DisplayProof
+        }
+        \\[4ex]
+        \multicolumn{2}{c}{
+            \AxiomC{$\Gamma \vdash \Delta$}
+            \RightLabel{\Weakening \. \text{(if $\Gamma \subseteq \Gamma'$ and $\Delta \subseteq \Delta'$)}}
+            \UnaryInfC{$\Gamma'\vdash \Delta'$}
+            \DisplayProof
+        }
+        \\[4ex]
+
+        \AxiomC{$\Gamma, \phi, \psi \vdash \Delta$}
+        \RightLabel{\LeftAnd}
+        \UnaryInfC{$\Gamma, \phi \land \psi \vdash \Delta$}
+        \DisplayProof 
+        &
+        \AxiomC{$\Gamma \vdash \phi, \Delta$}
+        \AxiomC{$\Sigma \vdash \psi, \Pi$}
+        \RightLabel{\RightAnd}
+        \BinaryInfC{$\Gamma, \Sigma \vdash \phi \land \psi,  \Delta, \Pi$}
+        \DisplayProof
+        \\[4ex]
+
+        \AxiomC{$\Gamma, \phi \vdash \Delta$}
+        \AxiomC{$\Sigma, \psi \vdash \Pi$}
+        \RightLabel{\LeftOr}
+        \BinaryInfC{$\Gamma, \Sigma, \phi\lor \psi \vdash \Delta, \Pi$}
+        \DisplayProof 
+        &
+        \AxiomC{$\Gamma \vdash \phi, \psi, \Delta$}
+        \RightLabel{\RightOr}
+        \UnaryInfC{$\Gamma \vdash \phi \lor \psi, \Delta$}
+        \DisplayProof
+        \\[4ex]
+
+        \AxiomC{$\Gamma \vdash \phi, \Delta$}
+        \RightLabel{\LeftNot}
+        \UnaryInfC{$\Gamma, \neg \phi \vdash \Delta$}
+        \DisplayProof 
+        &
+        \AxiomC{$\Gamma, \phi \vdash \Delta$}
+        \RightLabel{\RightNot}
+        \UnaryInfC{$\Gamma \vdash \neg \phi ,  \Delta$}
+        \DisplayProof
+        \\[4ex]
+
+        \AxiomC{$\Gamma, \phi_x[x := t] \vdash \Delta$}
+        \RightLabel{\LeftForall}
+        \UnaryInfC{$\Gamma, \all{x}{\phi_x}  \vdash \Delta$}
+        \DisplayProof 
+        &
+        \AxiomC{$\Gamma \vdash \phi_x, \Delta$}
+        \RightLabel{\RightForall}
+        \UnaryInfC{$\Gamma \vdash \all{x}{\phi_x},  \Delta$}
+        \DisplayProof
+        \\[4ex]
+
+        \AxiomC{$\Gamma, \phi_x \vdash \Delta$}
+        \RightLabel{\LeftExists}
+        \UnaryInfC{$\Gamma, \exi{x}{\phi_x} \vdash \Delta$}
+        \DisplayProof 
+        &
+        \AxiomC{$\Gamma \vdash \phi_x[x := t], \Delta$}
+        \RightLabel{\RightExists}
+        \UnaryInfC{$\Gamma \vdash \exi{x}{\phi_x},  \Delta$}
+        \DisplayProof
+        \\[4ex]
+
+        \multicolumn{2}{c}{
+          \AxiomC{$\Gamma, \phi[x := t] \vdash \Delta$}
+          \AxiomC{$\Sigma \vdash t \equiv u, \Pi$}
+          \RightLabel{\LeftSubst}
+          \BinaryInfC{$\Gamma, \Sigma, \phi[x := u] \vdash \Delta, \Pi$}
+          \DisplayProof 
+        }
+        \\[4ex]
+
+        \multicolumn{2}{c}{
+          \AxiomC{$\Gamma \vdash \phi[x := t], \Delta$}
+          \AxiomC{$\Sigma \vdash t \equiv u, \Pi$}
+          \RightLabel{\RightSubst}
+          \BinaryInfC{$\Gamma, \Sigma \vdash \phi[x := u], \Delta, \Pi$}
+          \DisplayProof
+        }
+        \\[4ex]
+
+        \multicolumn{2}{c}{
+          \AxiomC{}
+          \RightLabel{\Refl}
+          \UnaryInfC{$\vdash t \equiv t$}
+          \DisplayProof 
+        }
+    \end{tabular}
+    \end{center}
+    \caption{The deduction rules of FOL sequent calculus and of \SClamA. Note that in \RightForall and \RightExists, the variable $x$ must not be free in the resulting sequent.}
+    \label{fig:FOLSCRules}
+\end{figure}
+
+
+
+
+\lamfol seems more expressive than pure first-order logic, as we can write formulas such as (with $S: \Ind \to \Ind$):
+$$
+(\abs{h: (\Ind \to \Ind) \to \Ind \to \Prop}{\forall (h\app S)}) (\abs{g: \Ind \to \Ind}{\abs{x: \Ind}{(x \equiv g\app x)}}) : \Prop
+$$
+However, computing the canonical form of this expression yields:
+$$
+ \forall\app (\abs{x: \Ind}{(x \equiv S\app x)})
+$$
+corresponding directly to the pure FOL formula $\all{x}{x \equiv S(x)}$. This is in fact a general theorem, \textit{if the formula does not contain free variables of order greater than 1}.
+
+\begin{theorem}
+    \label{thm:canonical_lamfol}
+    Let $\phi$ be a formula of \lamfol, that does not contain free variables of order greater than 1. Then the canonical form of $\phi$ (denoted $\phi'$) is a formula of pure first-order logic.
+\end{theorem}
+\begin{proof}
+    We analyse the position of $\lambda$-abstractions in the expression tree of $\phi'$ to show that they only exist as arguments of $\exists$ and $\forall$. 
+    Consider one of the topmost subexpressions $e$ of $\phi'$ of the form $e = \abs{x}{e'}$ that is not the argument of a quantifier.
+
+    Note that $e$ cannot contain free variables of order greater than 1, as otherwise they would either be free in $\phi'$ (impossible sincewe assumed that $\phi$ contains no free higher-order variable) or bound in $\phi'$ (impossible since by assumption that $e$ is topmost), and by assumption we reject both. Note also that if $\phi' \neq e$, because $\phi': \Prop$ and , so $e$ has an arrow type.
+    Hence, $e$ necessarily occurs as part of an application.
+    \begin{itemize}
+        \item Case 1: $e$ is left of the application. In that case $\phi'$ contains a subterm of the form $(\abs{x}{e'}) t$, which is a $\beta$-redex, contradicting the assumption that $\phi'$ is in canonical form.
+        \item Case 2: $e$ is right of the application, so $\phi'$ contains a subterm of the form $t\app e$. Note that $\ord(t) \geq 3$. If $t$ is a syntactic abstraction, we once again have a $\beta$-redex. Hence, it must be that $t$ is either a variable, an application or a constant symbol. It cannot be a variable since $\phi'$ does not contain higher-order variables. $t$ cannot be an application either: indeed, let $f$ and $t_1, \ldots, t_n$ be such that $t = f\app t_1\app ...\app t_n$. Then $f$ cannot be an abstraction (as it would imply that $\phi'$ contains a $\beta$-redex), it cannot be a variable since $\phi'$ does not contain higher-order variables, and it cannot be a constant symbol because in our language there is no constant that matches the type of $f$. Hence, $t$ must be a higher-order constant symbol, and the only such symbols are $\forall$ and $\exists$. Hence, we necessarily have 
+        $$
+        t\app e = \forall \app (\abs{x: \Ind}{(e': \Prop)}) \sim \all{x}{e'}
+        $$
+        or
+        $$
+        t\app e = \exists \app (\abs{x: \Ind}{(e': \Prop)}) \sim \exi{x}{e'}
+        $$
+        
+        Hence we conclude by induction that all $\lambda$-abstractions in $\phi'$ occur as arguments of quantifiers. Additionally, because of $\eta$-expansion, there are no subexpressions of the form $\forall \app e$ or $\exists\app e$ where $e$ is not a $\lambda$-abstraction.
+        Hence $\phi'$ is a pure FOL formula.
+    \end{itemize}
+\end{proof}
+
+\begin{theorem}
+    \label{thm:sclamA_conservative}
+    Let $s$ be a sequent that does not contain free variables of order greater than 1. Then $s$ is provable in \SClamA if and only if its canonical form is provable in pure FOL.
+\end{theorem}
+
+\begin{proof}
+    Let $s'$ be the canonical form of $s$, which by \autoref{thm:canonical_lamfol} is a pure FOL sequent.
+    Its proof might contain higher order schematic variables, but since \SClamA has no  instantiation rule for schematic symbols, they behave exactly like constant symbols and can hence be replaced by concrete terms of the appropriate type without changing the proof.
+    Then, replacing a formula by an $\abe$-equivalent one preserves the applicability of the rules in \autoref{fig:FOLSCRules} by definition. Hence, if $s'$ is provable in \SClamA then every intermediate step can be replaced by its canonical form and so $s'$ has a proof where all formulas are pure FOL formulas. Such a proof is also a proof in pure FOL. Conversely, if $s'$ is provable in pure FOL, then it is provable in \SClamA since \SClamA extends pure FOL, and hence $s$ is provable in \SClamA.
+\end{proof}
+
+
+It seems that we did nothing but create new representations for pure first-order formulas. That is true, but only because we explicitly disallowed free higher-order variables and constant symbols.
+
+\subsection{Higher-order variables}
+\label{sec:schematic_variables}
+First-order logic by itself does not allow one to formalize much mathematics, and needs the axiomatization of some mathematical theory. ZF set theory, with or without the axiom of choice, will be our theory of choice. It contains the axiom schema of comprehension:
+\newcommand{\bluet}[1]{\textcolor{blue}{#1}}
+\newcommand{\redt}[1]{\textcolor{red}{#1}}
+$$\all{z}{\exi{y}{\all{x}{x \in y \iff (x \in z \land \bluet{P}(\redt{x}))}}}$$
+This schema is really an infinite set of axioms, one for every formula $P$with a distinguished variable $x$. It is hence convenient, and common in practice, to augment pure FOL with \textit{schematic functions and predicates}, such as the predicate $P$ above. These symbols can be instantiated: for example, instantiating $\bluet{P}$ with $\redt{x} \mapsto \bluet{\neg(\redt{x} \in \redt{x})}$ yields
+$$\all{z}{\exi{y}{\all{x}{x \in y \iff (x \in z \land \bluet{\neg(\redt{x} \in \redt{x})})}}}$$
+This coincides with the usual instantiation of variables in higher-order logic. 
+Of course, there is no reason to restrict schematic symbols to only appear in axioms. Then, we can use them to prove theorem schemas that cannot be expressed in pure FOL, such as:
+$$
+(A \land (B \lor C)) \iff ((A \land B) \lor (A \land C))
+$$
+
+Note that free variables can be seen as a special case of schematic function symbols of arity 0. Then, free higher-order variables in \lamfol are just a generalization of schematic function and predicate symbols.
+
+\begin{definition}
+\label{def:sclamB}
+The system \SClamB comprises the same deduction rules as \SClamA, with the addition of the following rule:
+\begin{center}
+    \AxiomC{$\Gamma \vdash \Delta$}
+            \RightLabel{\Inst}
+            \UnaryInfC{$\Gamma[f := e] \vdash \Delta[f := e]$}
+            \DisplayProof 
+\end{center}
+Where $f$ is a (possibly higher-order) variable of type $\tau$ and $e$ any expression of type $\tau$.
+\end{definition}
+
+\begin{theorem}
+    \label{thm:sclamB_conservative}
+    Let $s$ be a sequent where all formulas are in pure FOL. Then $s$ is provable in \SClamB if and only if it is provable in \SClamA (and hence in pure FOL).
+\end{theorem}
+\begin{proof}
+    The ``if'' direction is trivial, as \SClamA is a subsystem of \SClamB. For the ``only if'' direction, first rename variables across the proof so that each variable is only instantiated once. Then the proof is by induction on the size of the proof of $s$ in \SClamB. We proceed by case analysis on the last step of the proof, and note that the only new rule and non-trivial case is \Inst.
+\begin{center}
+    \AxiomC{$\A$}
+    \UnaryInfC{$\Gamma \vdash \Delta$}
+    \RightLabel{\Inst}
+    \UnaryInfC{$\Gamma[f := e] \vdash \Delta[f := e]$}
+    \DisplayProof 
+\end{center} %TODO: Is canonical form defined?
+Now, replace every occurrence of $f$ in every formula of every sequent of $\A$ by $e$, normalizing the result to canonical form. The result is still a valid proof of $\Gamma[f := e] \vdash \Delta[f := e]$ in \SClamB, but one less instance of \Inst than in the original proof. By induction, there is a proof of $\Gamma \vdash \Delta$ in \SClamA.
+\end{proof}
+Hence, a formula $\phi$ in \lamfol only if all its ground instances are provable in pure FOL.
+
+\subsection{Constants, definitions and description operators}
+\label{sec:description_operators}
+
+To make use of higher-order constant symbols, we need a definition principle to introduce new symbols in a mathematical theory.
+We will adopt the simplest possible such principle: a new constant is introduced as a definitional abbreviation for a closed expression.
+
+\begin{definition}
+\label{def:definition}
+    For a theory $\TT$, a \textit{definition} is a pair $(c, e)$ where $c: \tau$ is a constant symbol that is not in the language of $\TT$ and $e: \tau$ that does not contain free variables. 
+    If $\tau = \sigma_1 \to ... \to \sigma_n \to \Ind$, the theory $\TT'$ resulting from the definition $(c, e)$ is the theory $\TT$ extended with the constant symbol $c:\tau$ and the axiom $(c A B ...) \equiv (e A B ...)$, where  $A, B, ...$ are fresh variables of adequate types $\sigma_1, \ldots, \sigma_n$.
+    Otherwise if $\tau = \sigma_1 \to ... \to \sigma_n \to \Prop$, the added axiom is instead $(c A B ...) \iff (e A B ...)$.
+\end{definition}
+
+This definition principle is rather weak. In contrast, the usually allowed definition principle for pure FOL is as follows: If $\all{x, y, ...}{\exi{x}{P(x)}}$ is a proven theorem, then we may introduce a function symbol $f$ and the axiom $\all{x, y, ...}{P(f(x, y, ...))}$. This principle allows giving names to objects that exist but which have no description, and is similar to the process of skolemization in automated theorem proving. It can be shown that this principle yields a conservative extension \cite{shoenfieldMathematicalLogic2001}. 
+
+Moreover, we still have not addressed one key obstacle in representing expressions such as the integral or set comprehension. By \autoref{thm:canonical_lamfol}, every term that does not contain free higher-order variables is equivalent to a pure FOL term, which still cannot bind free variables. The latter definition principle allows to indirectly build terms from formulas (which can bind variables), but we do not want to introduce a new definition for every anonymous function. We can solve both problems by defining new constant symbols using a description operator.
+
+\begin{definition}[\SClamE]
+    \label{def:SClamIE}
+    \phantom{x}
+
+    \textbf{(Indefinite Description).} The system \SClamE is the same as \SClamB, with the addition of a new constant symbol $\epsilon$ of type $(\Ind \to \Prop) \to \Ind$ and the following deduction rule:
+    \begin{center}
+        \AxiomC{$\Gamma \vdash \exi{x}{\phi_x}$}
+        \RightLabel{\EpsilonRule}
+        \UnaryInfC{$\Gamma \vdash \phi[x:=\epsi{x}{\phi_x}]$}
+        \DisplayProof
+    \end{center}
+\end{definition}
+
+We could use the definite description operator $\iota$ instead, which requires not only existence but also unicity. In Lisa, we adopt $\epsilon$ for the very pragmatic reason that it requires less effort to use. $\iota$ can then be defined and $\IotaRule$ derived.
+
+In pure FOL, $\epsilon$ is a for free variables. The expression $\epsi{x}{P(x)}$ is a term that denotes some element that satisfies $P$, if one exists. If no such element exists, then nothing can be deduced about $\epsi{x}{P(x)}$ and it can denote any term in the domain. 
+It has been shown that extending first-order logic with $\epsilon$ is conservative, a fact known as the epsilon theorems \cite{troelstraBasicProofTheory2000}. However, in the presence of axiom schemas, it is not really conservative:
+
+\begin{lemma}
+    In pure FOL with ZF set theory, if formulas containing $\epsilon$ are allowed to instantiate axiom schemas, the axiom of choice is provable.
+
+\end{lemma}
+\begin{proof}
+    Consider the term $\epsi{x}{x \in y}$, parametrized by $y$. For any set $y \neq \emptyset$, this term denotes an element of $y$. Using this term within the axiom schema of replacement, we can obtain for any set $A$ containing only non-empty sets, the set:
+    $$
+        \lbrace (x, \epsi{y}{y \in x}) \mid x \in A \rbrace
+    $$
+    which is a choice function for $A$. Hence, using the new symbol, we can prove the axiom of choice, which is well known to be independent of ZF, so the extension is not conservative.
+\end{proof}
+
+This situation is not specific to the use of epsilon and can be similarly constructed using a principle of definition by existence. Concretely, the formula
+$$\all{x}{\exi{y}{x = \emptyset \lor y \in x}}$$
+is provable in ZF. We can hence define a new constant function $\operatorname{choice}(x)$ with the property $x = \emptyset \lor \operatorname{choice}(x) \in x$. Using this function within the axiom schema of replacement we can similarly obtain a choice function.
+
+This seems paradoxical, since we just claimed that this definition principle is conservative. The resolution of the paradox is that by introducing a new symbol "$\operatorname{choice}$", we implicitly also introduce new axioms. There would be no paradox if we treated axioms as a fixed set and the new symbols could not be used to instantiate the axiom schemas.
+
+This is, however, rather unintuitive and impractical for a user of the theory. We hence can either accept having built-in global choice via $\epsilon$, or instead use the definite $\iota$ operator, which is conservative even when used in axiom schemas. In Lisa, we adopt $\epsilon$ for the very pragmatic reason that it requires less effort to use and because we appily accept the axiom of choice anyway.
+
+
+
+\paragraph{Note.} By allowing us to use higher-order expressions, \lamfol gives us a lot of expressive power. But it raises a question: Are we really not, in fact, doing higher-order logic in disguise, and if not, what differentiates us from higher-order logic? The answer is that we miss both quantification over variables of order greater than 1 and equality on terms of order greater than 2. We do have equality on terms of order $1$, mainly $\equiv$ for terms and $\iff$ for formulas. We can also define equality on terms of order $2$ by extensionality: for $f, g: \sigma_1 \to ... \to \sigma_n \to \Ind$, we can define 
+$$f \equiv_2 g := \all{x_1, \ldots, x_n}{(f \app x_1 \app ... \app x_n) \equiv (g \app x_1 \app ... \app x_n)}
+$$
+
+The second, important in practice but less crucial difference between HOL and \lamfol is that \lamfol does not admit type variables. We do not need them in practice, since all the actual reasoning and processing takes place in the underlying set theory at the term level. The higher-order elements of \lamfol only serve a syntactic purpose. Hence, we argue that \lamfol is still, in spirit, first-order logic; only equipped with the means to reason about axioms and theorem schemas, and with syntactic tools that match the common vernacular practice of mathematics.
+
+
+\subsection{Lisa's Proof System}
+
+\input{sections/lamfol/kernel-proof}
+

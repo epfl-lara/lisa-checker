@@ -29,7 +29,8 @@ def Expr.alphaKey (e : Expr) : NamelessExpr × Option LSort :=
 /-- Compare binder structure without identifying distinct free variables. -/
 def AlphaEq (p q : Expr) : Prop := p.alphaKey = q.alphaKey
 
-instance : DecidableRel AlphaEq := fun _ _ => inferInstanceAs (Decidable (_ = _))
+instance : DecidableRel AlphaEq :=
+  fun p q => inferInstanceAs (Decidable (p.alphaKey = q.alphaKey))
 
 /-- Close sort-compatible beta and eta equations under equivalence and expression contexts. -/
 inductive Conversion : Expr → Expr → Prop
