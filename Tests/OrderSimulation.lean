@@ -5,21 +5,11 @@ open Lisa Expr Imported
 namespace Lisa.Tests.OrderSimulation
 
 /-- Use syntactic equality to expose a strict simulation without logical assumptions. -/
-private def literal : Order := Eq
-private def coarse : Order := fun _ _ => True
+private def literal : ExprRel := Eq
+private def coarse : ExprRel := fun _ _ => True
 
-private instance : OrderReduction literal where
-  reduce := id
-  preserves := fun _ => ⟨rfl, rfl⟩
-  preservesSort := fun _ => rfl
-
-private instance : OrderReduction coarse where
-  reduce := id
-  preserves := fun _ => ⟨trivial, trivial⟩
-  preservesSort := fun _ => rfl
-
-private def simulation : OrderSimulation literal coarse :=
-  ⟨fun _ => trivial, fun h => h⟩
+private def simulation : Subrelation literal coarse :=
+  fun _ => trivial
 
 private def a : Expr := .const (.named "A" prop)
 private def hole : Sequent := (∅, {a})

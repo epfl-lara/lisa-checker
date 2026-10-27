@@ -230,7 +230,7 @@ Source lambda evaluation inserts arguments into the environment; readback lambda
 
 ## 6. Revised correctness proof
 
-### Conversion invariance becomes simpler
+### AlphaBetaEta invariance becomes simpler
 
 Retain the evaluation/renaming theorem as environment precomposition:
 
@@ -305,7 +305,7 @@ The phase gate must include a Lean-checked soundness/canonicality proof for the 
 
 ## 7. Named and existing nameless interfaces
 
-`Lisa.NamelessExpr` in [../Conversion.lean](../Conversion.lean) currently counts **every binder**, irrespective of sort. Its syntax contributes to the original `AlphaEq` specification. The new syntax counts only same-sort binders.
+`Lisa.NamelessExpr` in [../AlphaBetaEta.lean](../AlphaBetaEta.lean) currently counts **every binder**, irrespective of sort. Its syntax contributes to the original `AlphaEq` specification. The new syntax counts only same-sort binders.
 
 ```text
 λ(_:prop). λ(_:ind). outerProp
@@ -369,9 +369,9 @@ Source: [Syntax.lean](Syntax.lean).
 
 New: `shift_s`, same/different-sort equations, optional `Scoped`/`LocallyClosed`, indexed support, and their preservation lemmas. No internal `sort`, `HasSort`, `Sub.Sorted`, or extrinsic application-checking infrastructure.
 
-### 8.2 Conversion.lean
+### 8.2 AlphaBetaEta.lean
 
-Source: [Conversion.lean](Conversion.lean).
+Source: [AlphaBetaEta.lean](AlphaBetaEta.lean).
 
 | Declaration | Revised disposition |
 |---|---|
@@ -480,7 +480,7 @@ Source: [Erasure.lean](Erasure.lean).
 | `Term.index` | Remove; bound variables already contain numeric indices. |
 | `Term.erase` | Replace by explicitly named per-sort-to-global format translation with an ordinary binder-sort stack. Optional on arbitrary open terms, proved successful on covered terms. |
 
-Conversion is no longer mere proof erasure: the index convention changes. Add rank/select lemmas. If a new per-sort raw format is separately desired, give it a different name rather than changing `Lisa.NamelessExpr` implicitly. No such extra format is required for this plan.
+AlphaBetaEta is no longer mere proof erasure: the index convention changes. Add rank/select lemmas. If a new per-sort raw format is separately desired, give it a different name rather than changing `Lisa.NamelessExpr` implicitly. No such extra format is required for this plan.
 
 ### 8.9 Elaboration.lean
 
@@ -569,9 +569,9 @@ Source: [NamedSubstitution.lean](NamedSubstitution.lean).
 
 Expected effect: moderate simplification of target-side dependent bookkeeping, little change to source fresh-name reasoning. Do not predict that changing indices removes the obligation to verify the existing named substitution algorithm.
 
-### 8.13 NamedConversion.lean
+### 8.13 NamedAlphaBetaEta.lean
 
-Source: [NamedConversion.lean](NamedConversion.lean).
+Source: [NamedAlphaBetaEta.lean](NamedAlphaBetaEta.lean).
 
 | Declaration | Revised disposition |
 |---|---|
@@ -579,10 +579,10 @@ Source: [NamedConversion.lean](NamedConversion.lean).
 | `ResultEquiv.refl`, `symm`, `trans` | Retain proofs with contexts removed. |
 | `ResultEquiv.app` | Retain sort-check failure propagation. No new conceptual burden. |
 | `ResultEquiv.lam` | Retain; source/result terms no longer differ in context indices. |
-| `interpretNamed_conversion` | Retain original named conversion → optional typed result equivalence. Beta/eta use revised substitution and shifts. |
-| `elaborate_conversion` | Retain consequence through original global-name erasure and new adapter. |
-| `compareNameless_of_conversion` | Retain positive comparison for sorted-source named conversions. |
-| `not_conversion_of_compareNameless_false` | Retain its consequence. |
+| `interpretNamed_alphaBetaEta` | Retain original named conversion → optional typed result equivalence. Beta/eta use revised substitution and shifts. |
+| `elaborate_alphaBetaEta` | Retain consequence through original global-name erasure and new adapter. |
+| `compareNameless_of_alphaBetaEta` | Retain positive comparison for sorted-source named conversions. |
+| `not_alphaBetaEta_of_compareNameless_false` | Retain its consequence. |
 
 Compared with the raw plan, these wrappers now stay. Compared with the current implementation, their shape is familiar and loses context dependence. The core does not need malformed terms to prove statements about malformed source expressions: `ResultEquiv.none` handles them.
 
@@ -626,8 +626,8 @@ Source: [NamedReflection.lean](NamedReflection.lean).
 | `Term.subst_empty` | Remove unconditional statement: empty stacks cannot open ambient indices. Replace by identity/opening lemma for locally closed terms. |
 | `elaborate_reify` | Retain exact round trip for locally closed typed terms, with successful reconstruction. |
 | `alpha_reify_of_elaborate` | Retain for translations of named sources; their local closure is already proved. |
-| `conversion_of_compareNameless` | Retain soundness for original named inputs. |
-| `compareNameless_iff_conversion` | Retain exact sorted-source named theorem. |
+| `alphaBetaEta_of_compareNameless` | Retain soundness for original named inputs. |
+| `compareNameless_iff_alphaBetaEta` | Retain exact sorted-source named theorem. |
 
 Scope issue requiring care: a symmetric conversion derivation can beta-expand through extra ambient variables even when its endpoints are locally closed. Do not assume every intermediate is locally closed. Two feasible proof strategies are: choose fresh names for the finite support of the entire derivation; or reconstruct the normalization-soundness derivation with explicit scope control rather than using arbitrary `Equiv.reify`. Decide this in the prototype, before promising a short named-reflection migration.
 
@@ -638,7 +638,7 @@ Source: [NamedDecision.lean](NamedDecision.lean).
 | Declaration | Revised disposition |
 |---|---|
 | `compareNamed` | Retain exact public signature/behavior. Direct canonical named interpretation can avoid the legacy global-index runtime path. |
-| `compareNamed_true`, `compareNamed_none`, `compareNamed_false` | Retain exact statements relative to original `Lisa.Conversion` and source sorting. |
+| `compareNamed_true`, `compareNamed_none`, `compareNamed_false` | Retain exact statements relative to original `Lisa.AlphaBetaEta` and source sorting. |
 | `SortedExpr`, `SortedExpr.Equivalent` | Retain unchanged named-source wrappers. |
 | `DecidableRel SortedExpr.Equivalent` | Retain using public comparison theorem. |
 | `normalizeNamed` | Retain signature: optional source interpretation → total typed normalization → named reconstruction. Prove no new reconstruction failure on translated inputs. |
@@ -646,7 +646,7 @@ Source: [NamedDecision.lean](NamedDecision.lean).
 | `normalizeNamed_sound`, `normalizeNamed_sort`, `normalizeNamed_none` | Retain exact public statements. |
 | `normalizeNamed_reify` | Retain for locally closed terms with successful empty-stack reconstruction. |
 | `normalizeNamed_idempotent` | Retain exact public statement, deterministic naming, and output local closure. |
-| `conversion_iff_normalizeNamed_eq` | Retain exact current sorted-source statement. Equality of two failed named normalizations is not conversion. |
+| `alphaBetaEta_iff_normalizeNamed_eq` | Retain exact current sorted-source statement. Equality of two failed named normalizations is not conversion. |
 
 ## 9. New obligations versus deleted obligations
 
@@ -680,7 +680,7 @@ An ordinary depth parameter in proofs is not a hidden context index: all terms s
 
 ### Phase 0: freeze contracts and baseline
 
-Keep [../Conversion.lean](../Conversion.lean), the reference calculus, and public checker statements unchanged. Preserve user changes in `COMMENTS.md` and the source files. Record named behavior, serialized-fixture outcomes, assumptions, axiom reports, and representative normalization timings.
+Keep [../AlphaBetaEta.lean](../AlphaBetaEta.lean), the reference calculus, and public checker statements unchanged. Preserve user changes in `COMMENTS.md` and the source files. Record named behavior, serialized-fixture outcomes, assumptions, axiom reports, and representative normalization timings.
 
 ### Phase 1: typed per-sort syntax and algebra
 
@@ -710,7 +710,7 @@ Port `Names`/`Packed`/`ResultEquiv`, alpha and named substitution correspondence
 
 ### Phase 5: integrate the checker
 
-[../Combined/Lambda.lean](../Combined/Lambda.lean) mainly uses `normalizeNamed_sound`, `normalizeNamed_idempotent`, `normalizeNamed_none`, and `conversion_iff_normalizeNamed_eq`. Keep these statements unchanged and preserve malformed-source fallback behavior. Existing validity certificates must still refer to the unchanged original calculus.
+[../Combined/Lambda.lean](../Combined/Lambda.lean) mainly uses `normalizeNamed_sound`, `normalizeNamed_idempotent`, `normalizeNamed_none`, and `alphaBetaEta_iff_normalizeNamed_eq`. Keep these statements unchanged and preserve malformed-source fallback behavior. Existing validity certificates must still refer to the unchanged original calculus.
 
 Gate: all configured library/tests build, combined/cache behavior agrees, serialized original proofs retain validity and assumption counts. Explain any changed result against the reference theorem, not by silently updating expectations.
 
@@ -734,13 +734,13 @@ Possible final structure keeps the current file roles, with `Erasure`/`Elaborati
 | Legacy input | Rank/select inverses; wrong global annotation and out-of-range index rejection |
 | Normalization | Core soundness/canonicality/idempotence and normal-form shape; named equivalents |
 | Trust | `#print axioms` for core/named central results; no new normalization axioms or admitted goals |
-| Dependencies | Conversion core remains independent of named syntax and evaluator; production avoids optional reference theories |
+| Dependencies | AlphaBetaEta core remains independent of named syntax and evaluator; production avoids optional reference theories |
 | Checker | Combined, cache, and serialized corpus tests, assumptions and closedness unchanged |
 | Performance | Same toolchain/inputs, measure normalization, compilation time, checker wall time and memory |
 
-Directly affected tests: `Tests/LambdaCore.lean`, `Tests/NamedIntegration.lean`, `Tests/NamedDecision.lean`, and the pipeline equation in `Tests/CombinedCore.lean`. Update typed constructors and scope-sensitive APIs, retain mathematical cases. Conversion-order, expression-normalization, combined, cached, and serialized-corpus tests remain integration gates.
+Directly affected tests: `Tests/LambdaCore.lean`, `Tests/NamedIntegration.lean`, `Tests/NamedDecision.lean`, and the pipeline equation in `Tests/CombinedCore.lean`. Update typed constructors and scope-sensitive APIs, retain mathematical cases. AlphaBetaEta-order, expression-normalization, combined, cached, and serialized-corpus tests remain integration gates.
 
-Use bounded generated named syntax to compare old/new comparison results and normalization idempotence, including malformed cases. This is regression evidence, not the correctness proof. Acceptance equivalence also follows from both implementations' proofs against the same `Lisa.Conversion`. Exact normalized named output equality is a separate naming-policy question.
+Use bounded generated named syntax to compare old/new comparison results and normalization idempotence, including malformed cases. This is regression evidence, not the correctness proof. Acceptance equivalence also follows from both implementations' proofs against the same `Lisa.AlphaBetaEta`. Exact normalized named output equality is a separate naming-policy question.
 
 Preserve the current deterministic fresh-name policy if practical, including the existing `freeX1` exact-output regression. If output names change, prove canonical named equality and compare alpha/conversion classes before deliberately adjusting only name-specific fixtures.
 

@@ -1,183 +1,171 @@
 import Lisa.Lambda.NamedEnvironment
 
+/-! Agreement with the shared alpha-equivalence specification. All-binders
+indices appear only in the alpha-key proof helpers in this module. -/
 namespace Lisa.Lambda
+/- Helpers below connect the shared alpha key's all-binders indices with the
+per-sort variables. They are proof infrastructure, not a second elaborator. -/
+namespace AlphaKey
 
-namespace Names
+def lift (b : LSort) (ρ : Ren) : Ren := fun s n =>
+  if s = b then match n with | 0 => 0 | n+1 => ρ s n + 1
+  else ρ s n + 1
 
-/-- Interpret the nearest occurrence of each name in a binder stack. -/
-def resolve : (bound : List SVar) → Sub (bound.map SVar.sort) Γ → Names Γ → Names Γ
+@[simp] theorem lift_zero : lift b ρ b 0 = 0 := by simp [lift]
+
+theorem lift_shift (b : LSort) (ρ : Ren) (s : LSort) (n : Nat) :
+    lift b ρ s (Ren.shift b s n) = ρ s n + 1 := by
+  by_cases h : s = b <;> simp [lift, Ren.shift, h]
+
+def erase (e : Term s) (ρ : Ren) : NamelessExpr := match e with
+  | .bound n => .bound (ρ s n) s
+  | .free x => .free ⟨x, s⟩
+  | .const c => .const ⟨c, s⟩
+  | .app f a => .app (erase f ρ) (erase a ρ)
+  | .lam b e => .lam b (erase e (lift b ρ))
+
+def liftSub (b : LSort) (σ : Sub) : Sub := fun s n => match n with
+  | 0 => .bound 0
+  | n+1 => (σ s n).shift b
+
+def resolve : List SVar → Sub → Names → Names
   | [], _, η => η
-  | x :: bound, σ, η => fun y =>
-      if h : y = x then h.symm ▸ σ .here
-      else resolve bound (fun v => σ (.there v)) η y
+  | x :: xs, σ, η => fun y =>
+      if h : y = x then h.symm ▸ σ x.sort 0
+      else resolve xs (fun s n => σ s (n+1)) η y
 
-theorem resolve_rename (bound : List SVar) (σ : Sub (bound.map SVar.sort) Γ)
-    (η : Names Γ) (ρ : Ren Γ Δ) :
-    resolve bound (fun v => (σ v).rename ρ) (η.rename ρ) =
-      (resolve bound σ η).rename ρ := by
-  induction bound with
+theorem resolve_rename (xs : List SVar) (σ : Sub) (η : Names) (ρ : Ren) :
+    resolve xs (fun s n => (σ s n).rename ρ) (η.rename ρ) = (resolve xs σ η).rename ρ := by
+  induction xs generalizing σ with
   | nil => rfl
-  | cons x bound ih =>
+  | cons x xs ih =>
       funext y
       by_cases h : y = x
-      · subst y; simp [resolve, rename]
-      · simpa [resolve, rename, h] using congrFun (ih (fun v => σ (.there v))) y
+      · subst y; simp [resolve, Names.rename]
+      · simpa [resolve, Names.rename, h] using congrFun (ih (fun s n => σ s (n+1))) y
 
-theorem resolve_bind (bound : List SVar) (σ : Sub (bound.map SVar.sort) Γ)
-    (η : Names Γ) (x : SVar) :
-    resolve (x :: bound) (Sub.lift σ) (η.rename Var.there) =
-      (resolve bound σ η).bind x := by
+theorem resolve_bind (xs : List SVar) (σ : Sub) (η : Names) (x : SVar) :
+    resolve (x :: xs) (liftSub x.sort σ) (η.rename (Ren.shift x.sort)) = (resolve xs σ η).bind x := by
   funext y
   by_cases h : y = x
-  · subst y; simp [resolve, bind]
-  · simp only [resolve, h, ↓reduceDIte, Sub.lift_there, resolve_rename, bind_other _ h]
-    rfl
+  · subst y; simp [resolve, Names.bind, liftSub]
+  · simp only [resolve, h, ↓reduceDIte, liftSub, Names.bind_other _ h]
+    exact congrFun (resolve_rename xs σ η (Ren.shift x.sort)) y
 
-theorem resolve_unbound (bound : List SVar) (σ : Sub (bound.map SVar.sort) Γ)
-    (η : Names Γ) (h : bound.idxOf? x = none) : resolve bound σ η x = η x := by
-  induction bound with
+theorem resolve_unbound (xs : List SVar) (σ : Sub) (η : Names)
+    (h : xs.idxOf? x = none) : resolve xs σ η x = η x := by
+  induction xs generalizing σ with
   | nil => rfl
-  | cons y bound ih =>
+  | cons y xs ih =>
       by_cases hxy : x = y
       · subst x; simp [List.idxOf?_cons] at h
       · simp [List.idxOf?_cons, Ne.symm hxy] at h
-        simpa [resolve, hxy] using ih (fun v => σ (.there v)) (by simpa using h)
+        simpa [resolve, hxy] using ih (fun s n => σ s (n+1)) (by simpa using h)
 
-theorem resolve_bound (bound : List SVar) (σ : Sub (bound.map SVar.sort) Γ)
-    (η : Names Γ) (h : bound.idxOf? x = some n) :
-    ∃ v : Var (bound.map SVar.sort) x.sort,
-      Var.lookup (bound.map SVar.sort) n = some ⟨x.sort, v⟩ ∧
-      resolve bound σ η x = σ v := by
-  induction bound generalizing n with
+theorem resolve_bound (xs : List SVar) (σ : Sub) (η : Names)
+    (h : xs.idxOf? x = some n) : resolve xs σ η x = σ x.sort n := by
+  induction xs generalizing σ n with
   | nil => simp at h
-  | cons y bound ih =>
+  | cons y xs ih =>
       by_cases hxy : x = y
-      · subst x
-        simp [List.idxOf?_cons] at h
-        subst n
-        exact ⟨.here, rfl, by simp [resolve]⟩
+      · subst x; simp [List.idxOf?_cons] at h; subst n; simp [resolve]
       · simp [List.idxOf?_cons, Ne.symm hxy] at h
         obtain ⟨i, hi, rfl⟩ := h
-        obtain ⟨v, hv, he⟩ := ih (fun v => σ (.there v)) hi
-        exact ⟨.there v, by simp [Var.lookup, hv], by simpa [resolve, hxy] using he⟩
+        simpa [resolve, hxy] using ih (fun s n => σ s (n+1)) hi
 
-end Names
-
-/-- Interpret nameless syntax with explicit bound and free environments. -/
-def interpretNameless (η : Names Δ) (σ : Sub Γ Δ) :
-    NamelessExpr → Option (Packed.Expr Δ)
+def interpret (η : Names) (σ : Sub) : NamelessExpr → Option Packed.Expr
   | .free x => some ⟨x.sort, η x⟩
   | .const c => some ⟨c.sort, .const c.id⟩
-  | .bound n s => do
-      let ⟨t, v⟩ ← Var.lookup Γ n
-      if h : s = t then some ⟨s, σ (h ▸ v)⟩ else none
-  | .app f a => do
-      let f' ← interpretNameless η σ f
-      let a' ← interpretNameless η σ a
-      Packed.app f' a'
-  | .lam s b =>
-      (interpretNameless (η.rename Var.there) (Sub.lift σ) b).map (Packed.lam s)
+  | .bound n s => some ⟨s, σ s n⟩
+  | .app f a => do let f ← interpret η σ f; let a ← interpret η σ a; Packed.app f a
+  | .lam s b => (interpret (η.rename (Ren.shift s)) (liftSub s σ) b).map (Packed.lam s)
 
-/-- Resolve names and erase them in either order without changing the result. -/
-theorem interpretNamed_resolve (e : Expr) (bound : List SVar)
-    (σ : Sub (bound.map SVar.sort) Γ) (η : Names Γ) :
-    interpretNamed e (Names.resolve bound σ η) =
-      interpretNameless η σ (e.toNameless bound) := by
-  induction e generalizing Γ bound with
+theorem interpret_resolve (e : Expr) (xs : List SVar) (σ : Sub) (η : Names) :
+    interpretNamed e (resolve xs σ η) = interpret η σ (e.toNameless xs) := by
+  induction e generalizing xs σ η with
   | var x =>
-      cases hi : bound.idxOf? x with
-      | none => simp [interpretNamed, Expr.toNameless, hi, interpretNameless,
-          Names.resolve_unbound bound σ η hi]
+      cases hi : xs.idxOf? x with
+      | none => simp [interpretNamed, Expr.toNameless, hi, interpret, resolve_unbound xs σ η hi]
+      | some n => simp [interpretNamed, Expr.toNameless, hi, interpret, resolve_bound xs σ η hi]
+  | const => rfl
+  | app f a ihf iha => simp only [interpretNamed, Expr.toNameless, interpret, ihf, iha]
+  | lam x b ih => simp only [interpretNamed, Expr.toNameless, interpret, ← resolve_bind, ih]
+
+def KeyEnv (xs : List SVar) (η : Names) (ρ : Ren) : Prop := ∀ x,
+  match xs.idxOf? x with
+  | none => η x = .free x.id
+  | some n => ∃ m, η x = .bound m ∧ ρ x.sort m = n
+
+theorem KeyEnv.bind (h : KeyEnv xs η ρ) (x : SVar) :
+    KeyEnv (x :: xs) (η.bind x) (lift x.sort ρ) := by
+  intro y; by_cases hy : y = x
+  · subst y
+    simp only [List.idxOf?_cons, beq_self_eq_true, ↓reduceIte]
+    exact ⟨0, Names.bind_self _ _, lift_zero⟩
+  · simp only [List.idxOf?_cons, show (x == y) = false from beq_eq_false_iff_ne.mpr (Ne.symm hy)]
+    have hh := h y
+    cases hi : xs.idxOf? y with
+    | none => simp only [hi] at hh ⊢; simp [Names.bind_other _ hy, hh, Term.rename]
+    | some n =>
+        simp only [hi] at hh ⊢
+        obtain ⟨m, hm, hr⟩ := hh
+        exact ⟨Ren.shift x.sort y.sort m, by simp [Names.bind_other _ hy, hm, Term.rename],
+          by simpa only [lift_shift] using congrArg (· + 1) hr⟩
+
+theorem erase_interpretNamed (p : Expr) (h : interpretNamed p η = some ⟨s, e⟩)
+    (hk : KeyEnv xs η ρ) : erase e ρ = p.toNameless xs := by
+  induction p generalizing s e η xs ρ with
+  | var x =>
+      cases h
+      have hh := hk x
+      cases hi : xs.idxOf? x with
+      | none => simp only [hi] at hh; simp [hh, erase, Expr.toNameless, hi]
       | some n =>
-          obtain ⟨v, hv, he⟩ := Names.resolve_bound bound σ η hi
-          simp [interpretNamed, Expr.toNameless, hi, interpretNameless, hv, he]
-  | const => rfl
-  | app f a ihf iha => simp only [interpretNamed, Expr.toNameless, interpretNameless, ihf, iha]
+          simp only [hi] at hh
+          obtain ⟨m, hm, hr⟩ := hh
+          simp [hm, erase, hr, Expr.toNameless, hi]
+  | const c => cases h; rfl
   | lam x b ih =>
-      simp only [interpretNamed, Expr.toNameless, interpretNameless, ← Names.resolve_bind, ih]
-      rfl
-
-/-- Preserve interpretation under alpha-equivalence in every sorted environment. -/
-theorem interpretNamed_alpha {e f : Expr} (h : AlphaEq e f) (η : Names Γ) :
-    interpretNamed e η = interpretNamed f η := by
-  have hs := congrArg Prod.fst h
-  rw [Expr.alphaKey, Expr.alphaKey] at hs
-  have empty : Sub [] Γ := fun v => nomatch v
-  simpa only [Names.resolve] using
-    (interpretNamed_resolve e [] empty η).trans
-      ((congrArg (interpretNameless η empty) hs).trans
-        (interpretNamed_resolve f [] empty η).symm)
-
-/-- Recover the original typed elaborator from the identity interpretation. -/
-theorem interpretNameless_identity (e : NamelessExpr) (Γ : List LSort) :
-    interpretNameless Names.free (Sub.id : Sub Γ Γ) e = elaborate Γ e := by
-  induction e generalizing Γ with
-  | free => rfl
-  | const => rfl
-  | bound n s =>
-      cases hv : Var.lookup Γ n with
-      | none => simp [interpretNameless, elaborate, hv]
+      cases hb : interpretNamed b (η.bind x) with
+      | none => simp [interpretNamed, hb] at h
       | some w =>
-          rcases w with ⟨t, v⟩
-          by_cases h : s = t <;> simp [interpretNameless, elaborate, hv, h, Sub.id]
-  | lam s b ih =>
-      simp only [interpretNameless, Sub.lift_id]
-      change (interpretNameless Names.free Sub.id b).map (Packed.lam s) = _
-      rw [ih]
-      cases hb : elaborate (s :: Γ) b <;> simp [elaborate, hb, Packed.lam]
+          rcases w with ⟨t, b'⟩
+          simp only [interpretNamed, hb, Option.map_some, Packed.lam, Option.some.injEq] at h
+          cases h; exact congrArg (NamelessExpr.lam x.sort) (ih hb (hk.bind x))
   | app f a ihf iha =>
-      simp only [interpretNameless, ihf, iha, elaborate]
-      cases hf : elaborate Γ f with
-      | none => rfl
+      cases hf : interpretNamed f η with
+      | none => simp [interpretNamed, hf] at h
       | some w =>
-          rcases w with ⟨s, f⟩
-          cases ha : elaborate Γ a with
-          | none => cases s <;> rfl
-          | some w => cases s <;> rfl
+          rcases w with ⟨fs, f'⟩
+          cases fs with
+          | ind => simp [interpretNamed, hf, Packed.app] at h
+          | prop => simp [interpretNamed, hf, Packed.app] at h
+          | arrow u t =>
+              cases ha : interpretNamed a η with
+              | none => simp [interpretNamed, hf, ha] at h
+              | some w =>
+                  rcases w with ⟨v, a'⟩
+                  by_cases hv : v = u
+                  · subst v
+                    simp [interpretNamed, hf, ha, Packed.app] at h
+                    obtain ⟨rfl, he⟩ := h; cases he
+                    exact congrArg₂ NamelessExpr.app (ihf hf hk) (iha ha hk)
+                  · simp [interpretNamed, hf, ha, Packed.app, hv] at h
+end AlphaKey
 
-/-- Use the existing name-erasing elaborator when free variables remain free. -/
-theorem interpretNamed_free (e : Expr) :
-    interpretNamed e (Names.free : Names []) = elaborate [] (e.toNameless []) := by
-  exact (interpretNamed_resolve e [] Sub.id Names.free).trans
-    (interpretNameless_identity _ [])
+theorem interpretNamed_alpha (h : AlphaEq p q) (η : Names) : interpretNamed p η = interpretNamed q η :=
+  (AlphaKey.interpret_resolve p [] Sub.id η).trans
+    ((congrArg (AlphaKey.interpret η Sub.id) (congrArg Prod.fst h)).trans
+      (AlphaKey.interpret_resolve q [] Sub.id η).symm)
 
-/-- Recover the named sort from the general interpretation and identity environment. -/
-theorem elaborate_named_sort (e : Expr) (bound : List SVar) :
-    (elaborate (bound.map SVar.sort) (e.toNameless bound)).map Sigma.fst = e.sort := by
-  rw [← interpretNameless_identity, ← interpretNamed_resolve]
-  exact interpretNamed_sort e (Names.resolve bound Sub.id Names.free)
-
-/-- Elaborate every well-sorted named expression at its original sort. -/
-theorem elaborate_named {e : Expr} (h : e.hasSort s) (bound : List SVar) :
-    ∃ t : Term (bound.map SVar.sort) s,
-      elaborate (bound.map SVar.sort) (e.toNameless bound) = some ⟨s, t⟩ := by
-  have hs := (elaborate_named_sort e bound).trans h
-  cases he : elaborate (bound.map SVar.sort) (e.toNameless bound) with
-  | none => simp [he] at hs
-  | some w =>
-      rcases w with ⟨u, t⟩
-      simp [he] at hs
-      subst u
-      exact ⟨t, rfl⟩
-
-/-- Reject precisely the malformed named expressions at the typed boundary. -/
-theorem elaborate_named_none (e : Expr) (bound : List SVar) :
-    elaborate (bound.map SVar.sort) (e.toNameless bound) = none ↔ e.sort = none := by
-  rw [← elaborate_named_sort e bound]
-  exact Option.map_eq_none_iff.symm
-
-
-/-- Characterize named alpha-equivalence by equality of successful typed interpretations. -/
-theorem alpha_iff_interpretNamed_eq {p q : Expr} (hp : p.hasSort s) (hq : q.hasSort s) :
-    AlphaEq p q ↔ interpretNamed p (Names.free : Names []) = interpretNamed q Names.free := by
+theorem alpha_iff_interpretNamed_eq (hp : p.hasSort s) (hq : q.hasSort s) :
+    AlphaEq p q ↔ interpretNamed p Names.free = interpretNamed q Names.free := by
   constructor
-  · exact fun h => interpretNamed_alpha h Names.free
+  · exact fun h => interpretNamed_alpha h _
   · intro h
-    rw [interpretNamed_free, interpretNamed_free] at h
-    obtain ⟨a, ha⟩ := elaborate_named hp []
-    simp only [List.map_nil] at ha
-    have hb := h.symm.trans ha
-    have hk := (elaborate_sound ha).symm.trans (elaborate_sound hb)
-    exact Prod.ext hk (hp.trans hq.symm)
-
+    obtain ⟨e, he⟩ := interpretNamed_sorted hp Names.free
+    have hf := h.symm.trans he
+    have hk : AlphaKey.KeyEnv [] Names.free Ren.id := fun _ => rfl
+    exact Prod.ext ((AlphaKey.erase_interpretNamed p he hk).symm.trans
+      (AlphaKey.erase_interpretNamed q hf hk)) (hp.trans hq.symm)
 end Lisa.Lambda

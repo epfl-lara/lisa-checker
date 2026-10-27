@@ -1,143 +1,141 @@
-import Lisa.Lambda.NamedConversion
-
-/-! Reconstruct named syntax without changing the original conversion relation. -/
+import Lisa.Lambda.NamedAlphaBetaEta
 
 namespace Lisa.Lambda
+/-- A naming assignment with a finite range, sufficient for any finite set of
+ambient variables. Reification performs this assignment; it is not injective. -/
 
-/-- Assign a free identifier to each variable in a typed context. -/
-abbrev Context (Γ : List LSort) := ∀ {s}, Var Γ s → Identifier
-
+structure Context where
+  lookup : LSort → Nat → Identifier
+  used : LSort → Finset Identifier
+  lookup_mem : ∀ s n, lookup s n ∈ used s
 namespace Context
 
-def empty : Context [] := fun v => nomatch v
+def empty : Context := ⟨fun _ _ => ⟨"_ambient", 0⟩, fun _ => {⟨"_ambient", 0⟩}, by simp⟩
 
-def extend (ρ : Context Γ) (x : Identifier) : Context (s :: Γ)
-  | _, .here => x
-  | _, .there v => ρ v
+def extend (ρ : Context) (x : SVar) : Context where
+  lookup s n := if s = x.sort then match n with | 0 => x.id | n+1 => ρ.lookup s n else ρ.lookup s n
+  used s := if s = x.sort then insert x.id (ρ.used s) else ρ.used s
+  lookup_mem s n := by
+    by_cases h : s = x.sort <;> cases n <;> simp [h, ρ.lookup_mem]
+variable {ρ : Context} {x : SVar}
 
-def vars : {Γ : List LSort} → Context Γ → Finset SVar
-  | [], _ => ∅
-  | s :: _, ρ => insert ⟨ρ .here, s⟩ (vars (fun v => ρ (.there v)))
+@[simp] theorem extend_zero : (ρ.extend x).lookup x.sort 0 = x.id := by simp [extend]
 
-theorem mem_vars (ρ : Context Γ) (v : Var Γ s) : (⟨ρ v, s⟩ : SVar) ∈ ρ.vars := by
-  induction v with
-  | here => simp [vars]
-  | there v ih => exact Finset.mem_insert_of_mem (ih _)
+@[simp] theorem extend_succ : (ρ.extend x).lookup x.sort (n+1) = ρ.lookup x.sort n := by simp [extend]
 
-@[simp] theorem vars_extend (ρ : Context Γ) (x : Identifier) :
-    vars (extend (s := s) ρ x) = insert ⟨x, s⟩ ρ.vars := rfl
+@[simp] theorem extend_other (h : s ≠ x.sort) : (ρ.extend x).lookup s n = ρ.lookup s n := by simp [extend, h]
 
-/-- Choose a binder outside the expression's free variables and the context names. -/
-def fresh (ρ : Context Γ) (xs : Finset SVar) (s : LSort) : SVar :=
-  ⟨freshId ((xs ∪ ρ.vars).image SVar.id) ⟨"x", 0⟩, s⟩
+def fresh (ρ : Context) (xs : Finset SVar) (s : LSort) : SVar :=
+  ⟨freshId (xs.image SVar.id ∪ ρ.used s) ⟨"x", 0⟩, s⟩
 
-theorem fresh_not_mem (ρ : Context Γ) (xs : Finset SVar) (s : LSort) :
-    ρ.fresh xs s ∉ xs ∪ ρ.vars := by
+@[simp] theorem fresh_sort (ρ : Context) (xs : Finset SVar) (s : LSort) : (ρ.fresh xs s).sort = s := rfl
+
+theorem fresh_not_used (ρ : Context) (xs : Finset SVar) (s : LSort) : (ρ.fresh xs s).id ∉ ρ.used s :=
+  fun h => freshId_not_mem _ _ (Finset.mem_union_right _ h)
+
+theorem fresh_not_mem (ρ : Context) (xs : Finset SVar) (s : LSort) : ρ.fresh xs s ∉ xs :=
+  fun h => freshId_not_mem (xs.image SVar.id ∪ ρ.used s) ⟨"x", 0⟩
+    (Finset.mem_union_left _ (Finset.mem_image.mpr ⟨ρ.fresh xs s, h, rfl⟩))
+
+theorem ne_lookup_of_unused (ρ : Context) (hx : x.id ∉ ρ.used x.sort) (s : LSort) (n : Nat) :
+    (⟨ρ.lookup s n, s⟩ : SVar) ≠ x := by
   intro h
-  exact freshId_not_mem ((xs ∪ ρ.vars).image SVar.id) ⟨"x", 0⟩
-    (Finset.mem_image.mpr ⟨ρ.fresh xs s, h, rfl⟩)
+  have hs := congrArg SVar.sort h
+  have hi := congrArg SVar.id h
+  exact hx (by simpa only [← hs, ← hi] using ρ.lookup_mem s n)
 
-def toSub (ρ : Context Γ) : Sub Γ [] := fun v => .free (ρ v)
-
+def toSub (ρ : Context) : Sub := fun s n => .free (ρ.lookup s n)
 end Context
 
 namespace Term
 
-@[simp] def freeVars : Term Γ s → Finset SVar
+@[simp] def freeVars : Term s → Finset SVar
   | .bound _ => ∅
-  | .free (s := s) x => {⟨x, s⟩}
+  | .free x => {⟨x, s⟩}
   | .const _ => ∅
   | .app f a => f.freeVars ∪ a.freeVars
-  | .lam b => b.freeVars
+  | .lam _ b => b.freeVars
 
-@[simp] theorem freeVars_rename (e : Term Γ s) (ρ : Ren Γ Δ) :
-    (e.rename ρ).freeVars = e.freeVars := by
-  induction e generalizing Δ <;> simp_all [rename]
+@[simp] theorem freeVars_rename (e : Term s) (ρ : Ren) : (e.rename ρ).freeVars = e.freeVars := by
+  induction e generalizing ρ <;> simp_all [rename]
 
-/-- Restore binder names, freshening each binder against its body and context. -/
-def reify : (e : Term Γ s) → Context Γ → Expr
-  | .bound (s := s) v, ρ => .var ⟨ρ v, s⟩
-  | .free (s := s) x, _ => .var ⟨x, s⟩
-  | .const (s := s) c, _ => .const ⟨c, s⟩
+def reify : Term s → Context → Expr
+  | .bound n, ρ => .var ⟨ρ.lookup s n, s⟩
+  | .free x, _ => .var ⟨x, s⟩
+  | .const c, _ => .const ⟨c, s⟩
   | .app f a, ρ => .app (f.reify ρ) (a.reify ρ)
-  | .lam (s := s) b, ρ =>
-      let x := ρ.fresh b.freeVars s
-      .lam x (b.reify (ρ.extend x.id))
+  | .lam s b, ρ => let x := ρ.fresh b.freeVars s; .lam x (b.reify (ρ.extend x))
 
-@[simp] theorem reify_sort (e : Term Γ s) (ρ : Context Γ) :
-    (e.reify ρ).sort = some s := by
-  induction e with
-  | lam b ih => simp [reify, ih, Context.fresh]
+@[simp] theorem reify_sort (e : Term s) (ρ : Context) : (e.reify ρ).sort = some s := by
+  induction e generalizing ρ with
+  | lam b e ih => simp [reify, ih, Context.fresh]
   | _ => simp_all [reify]
 
-/-- Bound free variables of the reconstructed syntax by the source and context. -/
-theorem reify_freeVars (e : Term Γ s) (ρ : Context Γ) :
-    (e.reify ρ).freeVars ⊆ e.freeVars ∪ ρ.vars := by
-  induction e with
-  | bound v => simpa [reify] using ρ.mem_vars v
-  | free => simp [reify]
-  | const => simp [reify]
+theorem reify_freeVars (e : Term s) (ρ : Context) :
+    ∀ y ∈ (e.reify ρ).freeVars, y ∈ e.freeVars ∨ y.id ∈ ρ.used y.sort := by
+  induction e generalizing ρ with
+  | bound n =>
+      intro y hy
+      simp only [reify, Expr.freeVars, Finset.mem_singleton] at hy
+      subst y
+      exact .inr (ρ.lookup_mem _ _)
+  | free x => simp [reify]
+  | const c => simp [reify]
   | app f a ihf iha =>
-      intro x hx
-      rcases Finset.mem_union.mp hx with hx | hx
-      · rcases Finset.mem_union.mp (ihf ρ hx) with h | h
-        · exact Finset.mem_union_left _ (Finset.mem_union_left _ h)
-        · exact Finset.mem_union_right _ h
-      · rcases Finset.mem_union.mp (iha ρ hx) with h | h
-        · exact Finset.mem_union_left _ (Finset.mem_union_right _ h)
-        · exact Finset.mem_union_right _ h
-  | lam b ih =>
+      intro y hy
+      rcases Finset.mem_union.mp hy with hy | hy
+      · exact (ihf ρ y hy).imp (Finset.mem_union_left _) id
+      · exact (iha ρ y hy).imp (Finset.mem_union_right _) id
+  | lam b e ih =>
       intro y hy
       simp only [reify, Expr.freeVars, Finset.mem_sdiff, Finset.mem_singleton] at hy
-      have hb := ih _ hy.1
-      simp only [Context.vars_extend, Finset.mem_union, Finset.mem_insert] at hb
-      rcases hb with hb | hb | hb
-      · exact Finset.mem_union_left _ hb
-      · exact False.elim (hy.2 hb)
-      · exact Finset.mem_union_right _ hb
-
+      rcases ih _ y hy.1 with hf | hu
+      · exact .inl hf
+      · by_cases hs : y.sort = b
+        · simp only [Context.extend, Context.fresh, hs, ↓reduceIte, Finset.mem_insert] at hu
+          rcases hu with hu | hu
+          · exact False.elim (hy.2 (by cases y; exact congrArg₂ SVar.mk hu hs))
+          · exact .inr (by simpa only [hs] using hu)
+        · exact .inr (by simpa only [Context.extend, Context.fresh, hs, ↓reduceIte] using hu)
 end Term
 
-/-- Interpret reconstructed syntax by the original typed substitution. -/
-theorem interpretNamed_reify (e : Term Γ s) (ρ : Context Γ) (η : Names Δ) (σ : Sub Γ Δ)
+theorem interpretNamed_reify (e : Term s) (ρ : Context) (η : Names) (σ : Sub)
     (hfree : ∀ x ∈ e.freeVars, η x = .free x.id)
-    (hbound : ∀ {t} (v : Var Γ t), η ⟨ρ v, t⟩ = σ v) :
+    (hbound : ∀ t n, η ⟨ρ.lookup t n, t⟩ = σ t n) :
     interpretNamed (e.reify ρ) η = some ⟨s, e.subst σ⟩ := by
-  induction e generalizing Δ with
-  | bound v => simp [Term.reify, interpretNamed, Term.subst, hbound]
-  | @free Γ s x =>
+  induction e generalizing ρ η σ with
+  | bound n => simp [Term.reify, interpretNamed, Term.subst, hbound]
+  | @free s x =>
       simpa [Term.reify, interpretNamed, Term.subst] using
-        congrArg (fun e : Term Δ s => some (⟨s, e⟩ : Packed.Expr Δ))
-          (hfree ⟨x, s⟩ (by simp))
+        congrArg (fun e : Term s => some (⟨s, e⟩ : Packed.Expr)) (hfree ⟨x, s⟩ (by simp))
   | const => rfl
   | app f a ihf iha =>
-      have hf := ihf ρ η σ (fun x hx => hfree x (Finset.mem_union_left _ hx)) hbound
-      have ha := iha ρ η σ (fun x hx => hfree x (Finset.mem_union_right _ hx)) hbound
-      simp [Term.reify, interpretNamed, hf, ha, Packed.app, Term.subst]
-  | @lam s Γ t b ih =>
-      let x := ρ.fresh b.freeVars s
-      have hx : x ∉ b.freeVars ∪ ρ.vars := ρ.fresh_not_mem _ _
-      have hf : ∀ y ∈ b.freeVars, (η.bind x) y = .free y.id := by
+      simp [Term.reify, interpretNamed, ihf ρ η σ (fun x hx => hfree x (Finset.mem_union_left _ hx)) hbound,
+        iha ρ η σ (fun x hx => hfree x (Finset.mem_union_right _ hx)) hbound, Packed.app, Term.subst]
+  | lam b e ih =>
+      let x := ρ.fresh e.freeVars b
+      have hx : x ∉ e.freeVars := ρ.fresh_not_mem e.freeVars b
+      have hu : x.id ∉ ρ.used x.sort := ρ.fresh_not_used e.freeVars b
+      have hf : ∀ y ∈ e.freeVars, (η.bind x) y = .free y.id := by
         intro y hy
-        have hyx : y ≠ x := fun h => hx (h ▸ Finset.mem_union_left _ hy)
-        simp [Names.bind_other _ hyx, hfree y hy, Term.rename]
-      have hb : ∀ {u} (v : Var (s :: Γ) u),
-          (η.bind x) ⟨ρ.extend x.id v, u⟩ = Sub.lift σ v := by
-        intro u v
-        cases v with
-        | here => exact Names.bind_self η x
-        | there v =>
-            have hvx : (⟨ρ v, u⟩ : SVar) ≠ x :=
-              fun h => hx (h ▸ Finset.mem_union_right _ (ρ.mem_vars v))
-            simpa [Context.extend, Names.bind_other _ hvx, Sub.lift] using
-              congrArg (Term.rename Var.there) (hbound v)
-      change (interpretNamed (b.reify (ρ.extend x.id)) (η.bind x)).map
-        (Packed.lam s) = _
-      rw [ih _ _ _ hf hb]
-      rfl
+        simp [Names.bind_other _ (show y ≠ x from fun h => hx (h ▸ hy)), hfree y hy, Term.rename]
+      have hb : ∀ t n, (η.bind x) ⟨(ρ.extend x).lookup t n, t⟩ = σ.lift x.sort t n := by
+        intro t n; by_cases h : t = x.sort
+        · subst t; cases n with
+          | zero =>
+              rw [Context.extend_zero, Sub.lift_zero]
+              exact Names.bind_self η x
+          | succ n =>
+              rw [Context.extend_succ]
+              simpa [Names.bind_other _ (ρ.ne_lookup_of_unused hu x.sort n), Sub.lift] using
+                congrArg (Term.rename (Ren.shift x.sort)) (hbound x.sort n)
+        · rw [Context.extend_other h]
+          simpa [Names.bind_other _ (ρ.ne_lookup_of_unused hu t n), Sub.lift, h] using
+            congrArg (Term.rename (Ren.shift x.sort)) (hbound t n)
+      change (interpretNamed (e.reify (ρ.extend x)) (η.bind x)).map (Packed.lam b) = _
+      rw [ih _ _ _ hf hb]; rfl
 
-@[simp] theorem interpretNamed_reify_free (e : Term Γ s) (ρ : Context Γ) :
+@[simp] theorem interpretNamed_reify_free (e : Term s) (ρ : Context) :
     interpretNamed (e.reify ρ) Names.free = some ⟨s, e.subst ρ.toSub⟩ :=
   interpretNamed_reify e ρ Names.free ρ.toSub (by intros; rfl) (by intros; rfl)
-
 end Lisa.Lambda

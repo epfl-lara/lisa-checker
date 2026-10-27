@@ -5,11 +5,11 @@
 
 Sort.lean
 Syntax.lean
-Conversion.lean (on Lisa terms)
+AlphaBetaEta.lean (on Lisa terms)
 
 ### Lambda package (on intrinsically typed terms)
 2. Lambda.Syntax
-3. Lambda.Conversion
+3. Lambda.AlphaBetaEta
 4. Lambda.Semantics
 5. Lambda.Evaluation
 6. Lambda.Normalization
@@ -20,48 +20,55 @@ Conversion.lean (on Lisa terms)
 11. Lambda.NamedEnvironment
 12. Lambda.NamedAlpha
 13. Lambda.NamedSubstitution
-14. Lambda.NamedConversion
+14. Lambda.NamedAlphaBetaEta
 15. Lambda.Reification
 16. Lambda.NamedReflection
 17. Lambda.NamedDecision
 
-### Expression prders and proof systems
-Orthologic/Basic.lean
+### Expression orders and proof systems
 Order.lean
 Ordered.lean
-Standard.lean
+AlphaBetaEtaOrder.lean
 Weakened.lean
-StandardOrdered.lean
-OrderedWeakened.lean
 OrderSimulation.lean
-
-### Imported proofs and the checker
+Sorting.lean
+OrderedEncoding.lean
+OrderedComparison.lean
+OrderedWeakened.lean
 Imported.lean
 ImportedWeakened.lean
-CheckerData.lean
-Checker.lean
-CheckerDisplay.lean
-Binary.lean
 
 ### The Orthologic Package
-Orthologic/Algebra.lean
-Orthologic/Formula.lean
-Orthologic/Calculus.lean
-Orthologic/CutElimination.lean
-Orthologic/Orthogonal.lean
-Orthologic/Certificate.lean
-Orthologic/LatticeContainment.lean
-Orthologic/Structural.lean
-Orthologic/Antichain.lean
-Orthologic/Normalize.lean
-Orthologic/Reduced.lean
-Orthologic/NormalizationComplete.lean
-Orthologic/Decision.lean
-Orthologic/Substitution.lean
-Orthologic/Free.lean
-Orthologic/Constraints.lean
-Orthologic/AtomicOrder.lean
-Orthologic
+Orthologic/Syntax.lean
+Orthologic/Comparison.lean
+Orthologic/StructuralOrder.lean
+Orthologic/Normalization.lean
+Orthologic/Derivation.lean
+Orthologic/Congruence.lean
+Orthologic/Provability.lean
+Orthologic/ComparisonSoundness.lean
+Orthologic/NormalizationSoundness.lean
+Orthologic/Lowering.lean
+Orthologic/LoweringSoundness.lean
+Orthologic/Expression.lean
+Orthologic/ExpressionSoundness.lean
+Orthologic/CacheKey.lean
+Orthologic/Cached.lean
+Orthologic/CachedSoundness.lean
+
+### Imported proofs and the checker
+Checker/ProofRelation.lean
+Checker/Encoding.lean
+Checker/Interfaces.lean
+Checker/Data.lean
+Checker/Check.lean
+Checker/Soundness.lean
+Checker/Display.lean
+Checker/Binary.lean
+CLI.lean
+
+The previous OL/Combined/Quantified implementation is kept in
+[Archive/Orthologic](Archive/Orthologic/README.md) for reference.
 
 ## Notes for me
 
@@ -76,7 +83,7 @@ normalizeNamed : Lisa.Expr → Option Lisa.Expr
 ## Comments
 
 ### Lambda
-[`Term`](Lisa/Conversion.lean#L77) is a the type of lambda expr modulo conversion. But [`isTerm`](Lisa/Syntax.lean#L64) is a predicate on the type of lambda expr true for expressions of type `Ind`.
+[`Term`](Lisa/AlphaBetaEta.lean#L77) is a the type of lambda expr modulo conversion. But [`isTerm`](Lisa/Syntax.lean#L64) is a predicate on the type of lambda expr true for expressions of type `Ind`.
 [`Term`](Lisa/Lambda/Syntax.lean#L13) is a type of lambda expr in de Bruijn form.
 
 The first isn't a great name.
@@ -99,17 +106,33 @@ They are proven equivalent in NamedAlpha. Are they both necessary? Could we drop
 ### Orders
 Why do we already mention Ortholattice in [Order.Lean](Lisa/Order.lean#L20)? Why is it necessary and wasn't the goal to have a version independent on the actual order as long as it is a suborder of provability? [`SequentTruth`](Lisa/Order.lean#L113) for examples is a class with a property that days that every sequent is smaller than top, that seems unnecessary?
 
+> **Response (SequentTruth):** I did miss that, it's indeed a bit weird. It is a result of me asking codex to minimize and isolate order preconditions. It actually found that this is one of the minimal conditions it needed to prove the correspondence between Imported and Weakened. `Lisa/ImportedWeakened.lean`
+
 [`Order := Expr → Expr → Prop`](Lisa/Order.lean#L8)does not imply an `Order` indeed is an order. If it was it would make a lot of the later classes theorems.
+
+> **Response:** Yes, we can change it to Rel, that's a bit stupid. We can also use `[PartialOrder leq]` in many places.
 
 [Order.lean](Lisa/Order.lean) is a bit long and hard to understand. Maybe it's definitions could be more clearly split across which version of the system they serve? There are also a lot of classes, some that contain a single member. I think they should just be actual theorems/Definitions? 
 
+> **Response:** Splitting and reorganization, yes, certainly. A class with one prop member is itself basically just a prop that can be carried as an instance. It's a bit neater and somewhat closer to Lean library design?
+
 Is the interpretation into an algebra really useful machinery? Would defining the order directly on Expr not work?
+
+> **Response:** We do define it directly on Expr? The algebra just bundles together an `Ortholattice A` and an `eval` function (the unique homomorphism into this algebra from the free ortholattice)
 
 [`sequentToFormula`](Lisa/Order.lean#L89) and [`sequentLeq`](Lisa/Order.lean#L92) are `noncomputable`, which seems strange since they are supposed to be actively used?
 
+> **Response:** there are list variants that are actually used for the computable parts; the reason is that Finset cannot be ordered without choice (???) as per mathlib definitions, so things become non computable. (It is defined via quotient of lists wrt permutation)
+>
+> I checked and `List` already implements all set operation typeclasses so it is mostly drop-in, but you just need to carry an assumption that says we are using it as a set. The Finset makes it cleaner to write and reason about, but requires a separate matching implementation.
+
 Ordered and Weakened names are confusing because weakened is not the one that boosts the weaken rule
 
+> **Response:** It was because Weakened weakens all the proof rules, but I am not partial to the name, I just didn't have a better idea at the time. Feel free to change it.
+
 Why is the Ordered namespace open in the middle of the Ordered.lean file, and why is the ProofTree inside it?
+
+> **Response — Sankalp Gambhir:** Tbh I like writing `Ordered.ProofTree` and `Weakened.ProofTree`; if you think it's bad design, you can rename it
 
 Overall the package deserves a good reorganisation and tightening I think
 
@@ -117,14 +140,20 @@ Overall the package deserves a good reorganisation and tightening I think
 
 Why is it built on the Weakened system (old Lisa kernel?) rather than the Ordered system (new Lisa kernel?)
 
+> **Response:** Weakened is the new kernel and Ordered is the old one. Hence the chain Standard -> Ordered -> Weakened -> Imported
+
 There is always both the computable list-based version of sequents and the nonvomputable Finset version. Could we just use the List one? Is it simpler that way? In particular that causes a gap in the end, where the checker is weaker than the actual system, no?
 
-In Checker.lean, why do we need the matching machinery?
+> **Response:** Somewhat answered above (see the response about `sequentToFormula`, `sequentLeq`, and the List/Finset representations).
+
+In Checker/Check.lean, why do we need the matching machinery?
 Why do we have two orders, the combined and the quantified one, for the checker? That doesn't match Lisa.
 
 
 ### Orthologic
 Why is there both Quantified and Combined? Quantified could be implemented directly.
+
+> **Response:** I have not looked carefully at the internals of the combined calculus implementation; I pushed it right after I had it working, it deserves much reorganisation.
 
 
 

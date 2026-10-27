@@ -39,11 +39,11 @@ private def pBeta : SortedExpr prop := ⟨.app idX (.var x), rfl⟩
 #guard decide (p.Equivalent pBeta)
 #guard !decide (p.Equivalent q)
 
-private def freeX1 : Term [] (prop >> prop) := .lam (.free ⟨"x", 1⟩)
+private def freeX1 : Term (prop >> prop) := .lam prop (.free ⟨"x", 1⟩)
 
 #guard freeX1.reify Context.empty =
   .lam ⟨⟨"x", 2⟩, prop⟩ (.var ⟨⟨"x", 1⟩, prop⟩)
-#guard elaborate [] ((freeX1.reify Context.empty).toNameless []) = some ⟨_, freeX1⟩
+#guard interpretNamed (freeX1.reify Context.empty) Names.free = some ⟨_, freeX1⟩
 
 private def samples : List Expr :=
   [.var x, .var y, .var xInd, f, idX, idY, capture, betaEta,
@@ -65,31 +65,30 @@ private def agrees (p q : Expr) : Bool :=
   | none => true
   | some q => normalizeNamed q == some q
 
-example {e f : Term Γ s} (h : Equiv e f) (ρ : Context Γ) :
-    Conversion (e.reify ρ) (f.reify ρ) := h.reify ρ
+example {e f : Term s} (h : Equiv e f) (ρ : Context) :
+    AlphaBetaEta (e.reify ρ) (f.reify ρ) := h.reify ρ
 
-example {p q : Expr} (hp : p.hasSort s) : compareNamed p q = some true ↔ Conversion p q :=
-  compareNameless_iff_conversion hp
+example {p q : Expr} (hp : p.hasSort s) : compareNamed p q = some true ↔ AlphaBetaEta p q :=
+  by rw [compareNamed_true]; exact and_iff_left (Option.isSome_iff_exists.mpr ⟨s, hp⟩)
 
-example {p q : Expr} (h : compareNamed p q = some true) : Conversion p q :=
-  conversion_of_compareNameless h
+example {p q : Expr} (h : compareNamed p q = some true) : AlphaBetaEta p q :=
+  (compareNamed_true.mp h).1
 
-example {p q : Expr} (hp : p.hasSort s) : Conversion p q ↔ normalizeNamed p = normalizeNamed q :=
-  conversion_iff_normalizeNamed_eq hp
+example {p q : Expr} (hp : p.hasSort s) : AlphaBetaEta p q ↔ normalizeNamed p = normalizeNamed q :=
+  alphaBetaEta_iff_normalizeNamed_eq hp
 
 example {p q : Expr} (h : normalizeNamed p = some q) : normalizeNamed q = some q :=
   normalizeNamed_idempotent h
 
-example (e : Term [] s) :
-    elaborate [] ((e.reify Context.empty).toNameless []) = some ⟨s, e⟩ := elaborate_reify e
+example (e : Term s) :
+    interpretNamed (e.reify Context.empty) Names.free = some ⟨s, e.subst Context.empty.toSub⟩ := interpretNamed_reify_free e Context.empty
 
 #print axioms interpretNamed_reify
 #print axioms Equiv.reify
-#print axioms conversion_of_compareNameless
 #print axioms compareNamed_true
 #print axioms compareNamed_false
 #print axioms normalizeNamed_sound
-#print axioms conversion_iff_normalizeNamed_eq
+#print axioms alphaBetaEta_iff_normalizeNamed_eq
 #print axioms normalizeNamed_idempotent
 
 end Lisa.Tests.NamedDecision

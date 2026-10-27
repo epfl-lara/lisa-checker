@@ -1,173 +1,219 @@
 import Lisa.Sort
 
-/-! Use intrinsically sorted de Bruijn terms for capture-free lambda metatheory. -/
-
+/-! Intrinsically sorted terms. Each sort has its own sequence of bound indices;
+indices beyond local binders denote ambient variables of that sort. -/
 namespace Lisa.Lambda
 
-/-- Locate a variable in a sorted binder context. -/
-inductive Var : List LSort → LSort → Type where
-  | here : Var (s :: Γ) s
-  | there : Var Γ s → Var (t :: Γ) s
+inductive Term : LSort → Type where
+  | bound (index : Nat) : Term s
+  | free (id : Identifier) : Term s
+  | const (id : Identifier) : Term s
+  | app : Term (s >> t) → Term s → Term t
+  | lam (domain : LSort) : Term t → Term (domain >> t)
+  deriving DecidableEq
 
-/-- Separate free identifiers from bound indices and rule out malformed applications. -/
-inductive Term : List LSort → LSort → Type where
-  | bound : Var Γ s → Term Γ s
-  | free (id : Identifier) : Term Γ s
-  | const (id : Identifier) : Term Γ s
-  | app : Term Γ (s >> t) → Term Γ s → Term Γ t
-  | lam : Term (s :: Γ) t → Term Γ (s >> t)
-
-abbrev Ren (Γ Δ : List LSort) := ∀ {s}, Var Γ s → Var Δ s
-
+abbrev Ren := LSort → Nat → Nat
 namespace Ren
 
-def id : Ren Γ Γ := fun v => v
+def id : Ren := fun _ n => n
 
-def comp (ρ : Ren Γ Δ) (τ : Ren Δ Θ) : Ren Γ Θ := fun v => τ (ρ v)
+def comp (ρ τ : Ren) : Ren := fun s n => τ s (ρ s n)
 
-def lift (ρ : Ren Γ Δ) : Ren (s :: Γ) (s :: Δ)
-  | _, .here => .here
-  | _, .there v => .there (ρ v)
+def shift (b : LSort) : Ren := fun s n => if s = b then n + 1 else n
 
-@[simp] theorem lift_here (ρ : Ren Γ Δ) : lift (s := s) ρ .here = .here := rfl
+def lift (b : LSort) (ρ : Ren) : Ren := fun s n =>
+  if s = b then match n with
+    | 0 => 0
+    | n+1 => ρ s n + 1
+  else ρ s n
 
-@[simp] theorem lift_there (ρ : Ren Γ Δ) (v : Var Γ t) :
-    lift (s := s) ρ (.there v) = .there (ρ v) := rfl
+@[simp] theorem lift_zero (ρ : Ren) : lift b ρ b 0 = 0 := by simp [lift]
 
-@[simp] theorem lift_id : @lift Γ Γ s id = @id (s :: Γ) := by
-  funext t v
-  cases v <;> rfl
+@[simp] theorem lift_succ (ρ : Ren) : lift b ρ b (n+1) = ρ b n + 1 := by simp [lift]
 
-@[simp] theorem lift_comp (ρ : Ren Γ Δ) (τ : Ren Δ Θ) :
-    @lift Γ Θ s (comp ρ τ) = @comp (s :: Γ) (s :: Δ) (s :: Θ) (lift ρ) (lift τ) := by
-  funext t v
-  cases v <;> rfl
+@[simp] theorem lift_other (h : s ≠ b) (ρ : Ren) : lift b ρ s n = ρ s n := by simp [lift, h]
 
+@[simp] theorem lift_id : lift b id = id := by
+  funext s n
+  by_cases h : s = b <;> cases n <;> simp [lift, id, h]
+
+@[simp] theorem lift_comp (ρ τ : Ren) : lift b (comp ρ τ) = comp (lift b ρ) (lift b τ) := by
+  funext s n
+  by_cases h : s = b <;> cases n <;> simp [lift, comp, h]
+
+theorem lift_shift (ρ : Ren) : comp (shift b) (lift b ρ) = comp ρ (shift b) := by
+  funext s n
+  by_cases h : s = b <;> simp [comp, shift, lift, h]
 end Ren
 
 namespace Term
 
-/-- Rename bound variables, lifting the map beneath each binder. -/
-def rename (ρ : Ren Γ Δ) : Term Γ s → Term Δ s
-  | .bound v => .bound (ρ v)
+def rename (ρ : Ren) : Term s → Term s
+  | .bound n => .bound (ρ s n)
   | .free x => .free x
   | .const c => .const c
   | .app f a => .app (f.rename ρ) (a.rename ρ)
-  | .lam b => .lam (b.rename (Ren.lift ρ))
+  | .lam b e => .lam b (e.rename (ρ.lift b))
 
-@[simp] theorem rename_id (e : Term Γ s) : e.rename Ren.id = e := by
+abbrev shift (b : LSort) (e : Term s) := e.rename (Ren.shift b)
+
+@[simp] theorem rename_id (e : Term s) : e.rename Ren.id = e := by
   induction e with
-  | lam b ih => simp [rename, ih]
+  | lam b e ih => simp [rename, ih]
   | _ => simp_all [rename, Ren.id]
 
-@[simp] theorem rename_comp (e : Term Γ s) (ρ : Ren Γ Δ) (τ : Ren Δ Θ) :
+@[simp] theorem rename_comp (e : Term s) (ρ τ : Ren) :
     (e.rename ρ).rename τ = e.rename (Ren.comp ρ τ) := by
-  induction e generalizing Δ Θ with
-  | lam b ih => simp [rename, ih]
+  induction e generalizing ρ τ with
+  | lam b e ih => simp [rename, ih]
   | _ => simp_all [rename, Ren.comp]
-
 end Term
 
-abbrev Sub (Γ Δ : List LSort) := ∀ {s}, Var Γ s → Term Δ s
-
+abbrev Sub := (s : LSort) → Nat → Term s
 namespace Sub
 
-def id : Sub Γ Γ := fun v => .bound v
+def id : Sub := fun _ n => .bound n
 
-def ofRen (ρ : Ren Γ Δ) : Sub Γ Δ := fun v => .bound (ρ v)
+def ofRen (ρ : Ren) : Sub := fun s n => .bound (ρ s n)
 
-def extend (σ : Sub Γ Δ) (a : Term Δ s) : Sub (s :: Γ) Δ
-  | _, .here => a
-  | _, .there v => σ v
+def extend (σ : Sub) (a : Term b) : Sub := fun s n =>
+  if h : s = b then match n with
+    | 0 => h.symm ▸ a
+    | n+1 => σ s n
+  else σ s n
+/-- Replacement terms shift even when their result sort differs from the binder. -/
 
-/-- Keep the new binder fixed and weaken every existing replacement. -/
-def lift (σ : Sub Γ Δ) : Sub (s :: Γ) (s :: Δ)
-  | _, .here => .bound .here
-  | _, .there v => (σ v).rename Var.there
+def lift (b : LSort) (σ : Sub) : Sub := fun s n =>
+  if s = b then match n with
+    | 0 => .bound 0
+    | n+1 => (σ s n).shift b
+  else (σ s n).shift b
 
-@[simp] theorem lift_here (σ : Sub Γ Δ) :
-    lift (s := s) σ .here = .bound .here := rfl
+@[simp] theorem extend_zero (σ : Sub) (a : Term b) : extend σ a b 0 = a := by simp [extend]
 
-@[simp] theorem lift_there (σ : Sub Γ Δ) (v : Var Γ t) :
-    lift (s := s) σ (.there v) = (σ v).rename Var.there := rfl
+@[simp] theorem extend_succ (σ : Sub) (a : Term b) : extend σ a b (n+1) = σ b n := by simp [extend]
 
-@[simp] theorem lift_id : @lift Γ Γ s id = @id (s :: Γ) := by
-  funext t v
-  cases v <;> rfl
+@[simp] theorem extend_other (h : s ≠ b) (σ : Sub) (a : Term b) : extend σ a s n = σ s n := by simp [extend, h]
 
-@[simp] theorem lift_ofRen (ρ : Ren Γ Δ) :
-    @lift Γ Δ s (ofRen ρ) = @ofRen (s :: Γ) (s :: Δ) (Ren.lift ρ) := by
-  funext t v
-  cases v <;> rfl
+@[simp] theorem lift_zero (σ : Sub) : lift b σ b 0 = .bound 0 := by simp [lift]
 
+@[simp] theorem lift_succ (σ : Sub) : lift b σ b (n+1) = (σ b n).shift b := by simp [lift]
+
+@[simp] theorem lift_other (h : s ≠ b) (σ : Sub) : lift b σ s n = (σ s n).shift b := by simp [lift, h]
+
+@[simp] theorem lift_id : lift b id = id := by
+  funext s n
+  by_cases h : s = b <;> cases n <;> simp [lift, id, Term.rename, Ren.shift, h]
+
+@[simp] theorem lift_ofRen (ρ : Ren) : lift b (ofRen ρ) = ofRen (ρ.lift b) := by
+  funext s n
+  by_cases h : s = b <;> cases n <;>
+    simp [lift, ofRen, Term.rename, Ren.shift, Ren.lift, h]
 end Sub
 
 namespace Term
 
-/-- Substitute sorted terms simultaneously without fresh-name generation. -/
-def subst (σ : Sub Γ Δ) : Term Γ s → Term Δ s
-  | .bound v => σ v
+def subst (σ : Sub) : Term s → Term s
+  | .bound n => σ s n
   | .free x => .free x
   | .const c => .const c
   | .app f a => .app (f.subst σ) (a.subst σ)
-  | .lam b => .lam (b.subst (Sub.lift σ))
+  | .lam b e => .lam b (e.subst (σ.lift b))
 
-@[simp] theorem subst_id (e : Term Γ s) : e.subst Sub.id = e := by
+@[simp] theorem subst_id (e : Term s) : e.subst Sub.id = e := by
   induction e with
-  | lam b ih => simp [subst, ih]
+  | lam b e ih => simp [subst, ih]
   | _ => simp_all [subst, Sub.id]
 
-@[simp] theorem subst_ofRen (e : Term Γ s) (ρ : Ren Γ Δ) :
-    e.subst (Sub.ofRen ρ) = e.rename ρ := by
-  induction e generalizing Δ with
-  | lam b ih => simp [subst, rename, ih]
+@[simp] theorem subst_ofRen (e : Term s) (ρ : Ren) : e.subst (Sub.ofRen ρ) = e.rename ρ := by
+  induction e generalizing ρ with
+  | lam b e ih => simp [subst, rename, ih]
   | _ => simp_all [subst, rename, Sub.ofRen]
 
-theorem rename_subst (e : Term Γ s) (σ : Sub Γ Δ) (ρ : Ren Δ Θ) :
-    (e.subst σ).rename ρ = e.subst (fun v => (σ v).rename ρ) := by
-  induction e generalizing Δ Θ with
-  | lam b ih =>
+theorem rename_subst (e : Term s) (σ : Sub) (ρ : Ren) :
+    (e.subst σ).rename ρ = e.subst (fun s n => (σ s n).rename ρ) := by
+  induction e generalizing σ ρ with
+  | lam b e ih =>
       simp only [subst, rename, ih]
       congr 2
-      funext t v
-      cases v with
-      | here => rfl
-      | there v =>
-          simp only [Sub.lift, rename_comp]
-          rfl
+      funext s n
+      by_cases h : s = b
+      · subst s; cases n <;> simp [Sub.lift, rename, Ren.lift, Ren.lift_shift]
+      · simp [Sub.lift, h, Ren.lift_shift]
   | _ => simp_all [subst, rename]
 
-theorem subst_rename (e : Term Γ s) (ρ : Ren Γ Δ) (σ : Sub Δ Θ) :
-    (e.rename ρ).subst σ = e.subst (fun v => σ (ρ v)) := by
-  induction e generalizing Δ Θ with
-  | lam b ih =>
+theorem subst_rename (e : Term s) (ρ : Ren) (σ : Sub) :
+    (e.rename ρ).subst σ = e.subst (fun s n => σ s (ρ s n)) := by
+  induction e generalizing σ ρ with
+  | lam b e ih =>
       simp only [rename, subst, ih]
       congr 2
-      funext t v
-      cases v <;> rfl
+      funext s n
+      by_cases h : s = b
+      · subst s; cases n <;> simp [Sub.lift, Ren.lift]
+      · simp [Sub.lift, Ren.lift, h]
   | _ => simp_all [subst, rename]
 
-@[simp] theorem subst_comp (e : Term Γ s) (σ : Sub Γ Δ) (τ : Sub Δ Θ) :
-    (e.subst σ).subst τ = e.subst (fun v => (σ v).subst τ) := by
-  induction e generalizing Δ Θ with
-  | lam b ih =>
+@[simp] theorem subst_comp (e : Term s) (σ τ : Sub) :
+    (e.subst σ).subst τ = e.subst (fun s n => (σ s n).subst τ) := by
+  induction e generalizing σ τ with
+  | lam b e ih =>
       simp only [subst, ih]
       congr 2
-      funext t v
-      cases v with
-      | here => rfl
-      | there v =>
-          simp only [Sub.lift, subst_rename, rename_subst]
+      funext s n
+      have hs (t : LSort) (k : Nat) : τ.lift b t (Ren.shift b t k) = (τ t k).shift b := by
+        by_cases h : t = b <;> simp [Sub.lift, Ren.shift, h]
+      by_cases h : s = b
+      · subst s
+        cases n with
+        | zero => simp [Sub.lift, subst]
+        | succ n => simp only [Sub.lift_succ, subst_rename, rename_subst, hs]
+      · simp only [Sub.lift_other h, subst_rename, rename_subst, hs]
   | _ => simp_all [subst]
 
-/-- Substitute the argument for the innermost binder. -/
-def single (arg : Term Γ s) : Sub (s :: Γ) Γ
-  | _, .here => arg
-  | _, .there w => .bound w
+def single (a : Term b) : Sub := Sub.extend Sub.id a
 
-def instantiate (body : Term (s :: Γ) t) (arg : Term Γ s) : Term Γ t :=
-  body.subst (single arg)
-
+def instantiate (e : Term t) (a : Term b) : Term t := e.subst (single a)
 end Term
+namespace Packed
 
+abbrev Expr  := Σ s, Term s
+
+def app : Expr → Expr → Option (Expr)
+  | ⟨.arrow s t, f⟩, ⟨u, a⟩ =>
+      if h : u = s then some ⟨t, .app f (h ▸ a)⟩ else none
+  | _, _ => none
+
+def lam (s : LSort) : Expr → Expr
+  | ⟨t, b⟩ => ⟨s >> t, .lam s b⟩
+
+def rename (ρ : Ren) : Expr → Expr
+  | ⟨s, e⟩ => ⟨s, e.rename ρ⟩
+
+def subst (σ : Sub) : Expr → Expr
+  | ⟨s, e⟩ => ⟨s, e.subst σ⟩
+
+theorem rename_app (ρ : Ren) (f a : Expr) :
+    (app f a).map (rename ρ) = app (rename ρ f) (rename ρ a) := by
+  rcases f with ⟨s, f⟩
+  rcases a with ⟨u, a⟩
+  cases s with
+  | arrow s t =>
+      by_cases h : u = s
+      · subst u; simp [app, rename, Term.rename]
+      · simp [app, rename, h]
+  | _ => rfl
+
+theorem subst_app (σ : Sub) (f a : Expr) :
+    (app f a).map (subst σ) = app (subst σ f) (subst σ a) := by
+  rcases f with ⟨s, f⟩
+  rcases a with ⟨u, a⟩
+  cases s with
+  | arrow s t =>
+      by_cases h : u = s
+      · subst u; simp [app, subst, Term.subst]
+      · simp [app, subst, h]
+  | _ => rfl
+
+end Packed
 end Lisa.Lambda

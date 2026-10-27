@@ -1,6 +1,5 @@
-import Lisa.StandardOrdered
+import Lisa.OrderedComparison
 import Lisa.OrderedWeakened
-import Tests.OrderModel
 
 open Lisa Expr
 
@@ -44,16 +43,15 @@ example : (SubstContext.mk [x, x] (.var x)).instantiate [.var y, .var x1] =
 example : (SubstContext.mk [] q).instantiate [] = q := by decide
 example : ¬ context.fits [] := by unfold SubstContext.fits; decide
 example : ¬ context.fits [SubstPair.mk q q] := by unfold SubstContext.fits; decide
-example : ¬ (SubstContext.mk [x] (.var x)).wellSorted := by
-  simp [SubstContext.wellSorted, x]
+example : ¬ (SubstRule.mk [(⟨.var x, .var y⟩, [])] ⟨[x], .var x⟩).valid := by decide
 
 def atom : Expr := .const ⟨⟨"A", 0⟩, prop⟩
-example : (SubstPair.mk atom atom).liftEq = iff atom atom := by decide
-example : (SubstPair.mk atom atom).liftEq.sort = some prop := by decide
-example : (SubstPair.mk (.var x) (.var y)).liftEq = eq (.var x) (.var y) := by decide
-example : (SubstPair.mk p p).liftEq.sort = some prop := by decide
-example : (SubstPair.mk p p).liftEq =
-    forall_ x1 (iff (.app p (.var x1)) (.app p (.var x1))) := by decide
+example : (SubstPair.mk atom atom).pointwiseEq [] = iff atom atom := by decide
+example : ((SubstPair.mk atom atom).pointwiseEq []).sort = some prop := by decide
+example : (SubstPair.mk (.var x) (.var y)).pointwiseEq [] = eq (.var x) (.var y) := by decide
+example : ((SubstPair.mk p p).pointwiseEq [x1]).sort = some prop := by decide
+example : (SubstPair.mk p p).pointwiseEq [x1] =
+    iff (.app p (.var x1)) (.app p (.var x1)) := by decide
 
 -- Quantifier eigenvariables are checked on the whole target sequent.
 example : x1 ∈ Lisa.freeVars (({q} : Finset Expr) ∪ {forall_ x1 q}) := by decide
@@ -61,119 +59,18 @@ example : x1 ∈ Lisa.freeVars (({q} : Finset Expr) ∪ {forall_ x1 q}) := by de
 -- Multi-premise connective rules reject an empty premise list.
 example : ¬ (([] : List (AnnotatedSequent Expr)) ≠ ∅) := by simp
 
-section Order
-
-variable {leq : Order} [OrderAlgebra leq] [OrderReduction leq]
-
--- Whole-sequent restatement must identify tautologies with different atoms.
-example : sequentLeq leq {atom} {atom} {top} {top} := by
-  rw [sequentLeq, OrderAlgebra.compare (leq := leq),
-    OrderAlgebra.value_sequent, OrderAlgebra.value_sequent]
-  simp only [Finset.inf_singleton, Finset.sup_singleton]
-  have h : ∀ a : OrderAlgebra.Carrier (leq := leq), aᶜ ⊔ a = ⊤ :=
-    fun a => by rw [sup_comm]; exact Ortholattice.sup_compl a
-  simp only [h, le_refl]
-
--- Instantiation is constrained to the original sides, even for empty substitution.
-example : ¬ setLeq leq ({atom} : Finset Expr) ∅ := by
+-- Context matching remains a relation-level condition.
+example {leq : ExprRel} : ¬ setLeq leq ({atom} : Finset Expr) ∅ := by
   simp [setLeq]
 
--- Normalized retained contexts do not silently use the full formula order.
-example {r s : Expr} (h : ¬ reducedSame leq r s) :
-    ¬ reducedSubset leq {r} {s} := by
-  simpa [reducedSubset] using h
-example {r s a b : Expr} (h : r ≠ s)
+example {leq : ExprRel} {r s a b : Expr} (h : ¬ isSame leq r s)
     (ha : ¬ isSame leq r a) (hb : ¬ isSame leq r b) :
     ¬ containedExceptEither leq {r} {s} a b := by
   simpa [containedExceptEither] using And.intro h (And.intro ha hb)
 
-example : Nonempty (Weakened.ProofTree leq ∅ {top}) := by
-  apply Nonempty.intro
-  apply Weakened.ProofTree.restateTrue
-  · simp
-  · simp [Expr.top]
-  · apply OrderAlgebra.same_iff.mpr
-    simp [OrderAlgebra.value_sequent, OrderAlgebra.top_eq, OrderAlgebra.compl_top]
-
-example (h : isSame leq (.var x) (.var y)) :
-    Nonempty (Weakened.ProofTree leq ∅ {eq (.var x) (.var y)}) := by
-  apply Nonempty.intro
-  apply Weakened.ProofTree.rightRefl (.var x) (.var y)
-  · simp
-  · simp [Expr.eq, x, y]
-  · rfl
-  · rfl
-  · exact h
-  · exact ⟨_, Finset.mem_singleton_self _, ⟨OrderAlgebra.reflexive _, OrderAlgebra.reflexive _⟩⟩
-
-example [Nontrivial (OrderAlgebra.Carrier (leq := leq))] :
-    ¬ isSame leq (sequentToFormula ∅ {bot}) top := by
-  intro h
-  have heq := OrderAlgebra.same_iff.mp h
-  simp [OrderAlgebra.bot_eq, OrderAlgebra.top_eq, OrderAlgebra.compl_top] at heq
-
-example [Nontrivial (OrderAlgebra.Carrier (leq := leq))] :
-    OrderReduction.reduce (leq := leq) top ≠ OrderReduction.reduce (leq := leq) bot := by
-  intro h
-  have heq := OrderAlgebra.same_iff.mp (OrderReduction.sound top bot h)
-  simp [OrderAlgebra.top_eq, OrderAlgebra.bot_eq] at heq
-
-end Order
-
--- Replay a nonliteral reflexivity step through strict reflexivity and restatement.
-def equivalentRefl : Weakened.ProofTree AlignmentModel.leq ∅ {eq (.var x) (.var y)} :=
-  Weakened.ProofTree.rightRefl (.var x) (.var y)
-    (by simp) (by simp [Expr.eq, x, y]) (by rfl) (by rfl)
-    (by unfold isSame AlignmentModel.leq; decide)
-    ⟨_, Finset.mem_singleton_self _, ⟨OrderAlgebra.reflexive _, OrderAlgebra.reflexive _⟩⟩
-
-example : (.var x : Expr) ≠ .var y := by decide
-example : ¬ isSame AlignmentModel.leq (.var x) (.var x1) := by
-  unfold isSame AlignmentModel.leq
-  decide
-example : Nonempty (Ordered.ProofTree AlignmentModel.leq ∅ {eq (.var x) (.var y)}) :=
-  ⟨weakenedToOrdered equivalentRefl⟩
-
-private def hasRightReflReplay {Γ Δ} : Ordered.ProofTree AlignmentModel.leq Γ Δ → Bool
-  | .weakening _ _ _ _ (.restate _ _ _ _ (.rightRefl _ _) _ _) _ => true
-  | _ => false
-
-example : hasRightReflReplay (weakenedToOrdered equivalentRefl) = true := by rfl
-
-def removedRefl : Weakened.ProofTree AlignmentModel.leq ∅ {top} :=
-  Weakened.ProofTree.leftRefl (Γ₁ := {eq (.var x) (.var y)}) (Γ₂ := {top})
-    (.var x) (.var y)
-    (by simp [Expr.eq, x, y]) (by simp [Expr.top])
-    (Weakened.ProofTree.restateTrue
-      (by simp [Expr.eq, x, y]) (by simp [Expr.top])
-      (by
-        apply OrderAlgebra.same_iff.mpr
-        simp [OrderAlgebra.top_eq]))
-    (by simp) (by simp [Expr.top]) (by rfl) (by rfl)
-    (by unfold isSame AlignmentModel.leq; decide)
-    (reducedSubset_of_subset (Finset.Subset.refl _))
-    (by
-      intro p hp
-      have h := Finset.mem_singleton.mp hp
-      subst p
-      exact Or.inr ⟨OrderAlgebra.reflexive _, OrderAlgebra.reflexive _⟩)
-
-example : Nonempty (Ordered.ProofTree AlignmentModel.leq ∅ {top}) :=
-  ⟨weakenedToOrdered removedRefl⟩
-
-private def hasLeftReflReplay {Γ Δ} : Ordered.ProofTree AlignmentModel.leq Γ Δ → Bool
-  | .leftRefl _ _ _ _ (.restate _ _ _ _ _ _ _) => true
-  | _ => false
-
-example : hasLeftReflReplay (weakenedToOrdered removedRefl) = true := by rfl
-
 #print axioms ordered_eq_weakened
-#print axioms StandardOrdered.standard_eq_ordered
+#print axioms Ordered.provable_iff
 #print axioms Subst.subst_preserves_sort
 #print axioms freshId_not_mem
-#print axioms OrderAlgebra.sequentLeq_of_setLeq
-#print axioms OrderReduction.sound
-#print axioms equivalentRefl
-#print axioms removedRefl
 
 end AlignmentTests

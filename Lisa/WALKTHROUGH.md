@@ -1,6 +1,6 @@
 # Orders and proof systems in Lisa
 
-This guide covers the next layer after [the Lambda package](Lambda/README.md): the interfaces for comparing expressions, three presentations of sequent proofs, and the translations between them.
+This guide covers the next layer after [the Lambda package](Lambda/README.md): the interfaces for comparing expressions, two presentations of sequent proofs, and the translations between them.
 
 The purpose of this layer is to describe **which proof steps the checker may accept and how flexible proof steps can be justified by more explicit ones**. It does not yet implement the concrete comparison algorithm or the executable checker.
 
@@ -8,30 +8,29 @@ The purpose of this layer is to describe **which proof steps the checker may acc
 
 Read these files in this order:
 
-1. [Orthologic/Basic.lean](Orthologic/Basic.lean): the algebraic structure used to interpret propositional operations.
-2. [Order.lean](Order.lean): expression comparison, reduction, context matching, and the required laws.
-3. [Ordered.lean](Ordered.lean): explicit sequent rules with order-based structural steps.
-4. [Standard.lean](Standard.lean): the corresponding rules with ordinary set-inclusion weakening.
-5. [Weakened.lean](Weakened.lean): rules accepting flexible premise and conclusion contexts.
-6. [StandardOrdered.lean](StandardOrdered.lean): translations between Standard and Ordered, under stated assumptions.
-7. [OrderedWeakened.lean](OrderedWeakened.lean): translations between Ordered and Weakened.
-8. [OrderSimulation.lean](OrderSimulation.lean): transferring successful comparisons between different orders.
+1. [Order.lean](Order.lean): expression relations, context matching, and constructor-compatibility interfaces.
+2. [Ordered.lean](Ordered.lean): explicit sequent rules, ordinary weakening, and order-based restatement.
+3. [AlphaBetaEtaOrder.lean](AlphaBetaEtaOrder.lean): Ordered instantiated with alpha-beta-eta conversion.
+4. [Weakened.lean](Weakened.lean): rules accepting flexible premise and conclusion contexts.
+5. [OrderedEncoding.lean](OrderedEncoding.lean), then [OrderedComparison.lean](OrderedComparison.lean): sequent packing and translations between Ordered instances under admissibility.
+6. [OrderedWeakened.lean](OrderedWeakened.lean): translations between Ordered and Weakened.
+7. [OrderSimulation.lean](OrderSimulation.lean): transferring successful comparisons between different orders.
 
 The local import graph is:
 
 ```text
-Syntax ──────────┐
-                v
-Orthologic.Basic → Order → Ordered → Standard
-                     │       │          │
-                     │       └→ Weakened│
-                     │                  │
-                     │   Ordered + Standard → StandardOrdered
-                     │   Ordered + Weakened → OrderedWeakened
-                     └→ OrderSimulation
+Syntax → Order → Ordered → AlphaBetaEtaOrder ← AlphaBetaEta
+           │       └→ Weakened
+           └→ OrderSimulation
+
+Ordered → OrderedEncoding
+OrderedEncoding + OrderSimulation → OrderedComparison
+Ordered + Weakened → OrderedWeakened
 ```
 
-`OrderSimulation` can be read immediately after `Order`; its later position makes its purpose easier to appreciate. `Standard` imports `Ordered` to reuse the substitution data definitions, although its own proof datatype has no order parameter.
+`OrderSimulation` can be read immediately after `Order`; its later position makes its purpose easier to appreciate. `AlphaBetaEtaOrder` supplies the baseline instance without defining another proof datatype.
+
+[Orthologic/Basic.lean](Orthologic/Basic.lean), described below for background, is now needed only when reading the orthologic implementation. It is not a dependency of `Order.lean`.
 
 ## What a sequent and a proof tree mean
 
@@ -43,12 +42,12 @@ The notation
 
 represents a sequent with assumptions `Γ` and alternatives `Δ`. Informally, if all assumptions hold, at least one formula on the right holds. Both sides are `Finset Expr`, so order and repetitions of formulas are already forgotten.
 
-**Here `Γ` is a finite set of formulas, not the list of variable sorts used in `Lambda.Term Γ s`.** These are different uses of the same conventional letter.
+**Here `Γ` is a finite set of formulas.** The current lambda package uses `Term s`, without a variable-context parameter.
 
 The declarations
 
 ```lean
-Standard.ProofTree Γ Δ
+Ordered.AlphaBetaEtaProof Γ Δ
 Ordered.ProofTree leq Γ Δ
 Weakened.ProofTree leq Γ Δ
 ```
@@ -59,22 +58,17 @@ The trees live in `Type`. Therefore, the statement that a derivation exists is w
 
 `Expr` is the original named syntax. It does not enforce sorting in its datatype, so the rules explicitly require `isFormula φ`, `isTerm t`, and `isFSet Γ` (every member of `Γ` is a formula).
 
-## 1. Orthologic/Basic: the algebra behind the order
+## 1. Orthologic: the comparison algorithm
 
-Source: [Orthologic/Basic.lean](Orthologic/Basic.lean).
+The active [Orthologic package](Orthologic/REORGANIZATION_PLAN.md) implements
+αβη canonicalization followed by extended OL normalization and comparison.
+Its soundness target is `Ordered AlphaBetaEta`, using actual inference rules.
+The proof-system interfaces below do not depend on the algorithm or an algebra.
 
-This short file defines `Ortholattice α`. It extends a lattice with a greatest element, a least element, and a complement operation:
-
-| Algebra | Intended propositional operation |
-|---|---|
-| `a ⊓ b` | conjunction |
-| `a ⊔ b` | disjunction |
-| `⊤`, `⊥` | truth, falsity |
-| `aᶜ` | negation |
-
-Its additional fields say that complement reverses order, applying it twice returns the original element, and `a ⊔ aᶜ = ⊤`.
-
-There is **no distributivity assumption** in this class. Do not silently replace it with a Boolean algebra when reading proofs. Nor does this file define expressions, proofs, normalization, or a decision procedure: it only specifies an algebraic interface.
+The previous ortholattice-based implementation is preserved in
+[Archive/Orthologic](../Archive/Orthologic/README.md). It is excluded from active
+builds. In particular, no ortholattice completeness assumption is needed by the
+new checker.
 
 ## 2. Order: comparison and the laws needed by its consumers
 
@@ -83,10 +77,10 @@ Source: [Order.lean](Order.lean).
 ### An order starts as an arbitrary relation
 
 ```lean
-abbrev Order := Expr → Expr → Prop
+abbrev ExprRel := Expr → Expr → Prop
 ```
 
-Despite its name, this abbreviation alone imposes no reflexivity, transitivity, or antisymmetry. Those properties are requested separately where needed.
+This abbreviation alone imposes no reflexivity, transitivity, or antisymmetry. Those properties are requested separately where needed.
 
 For a chosen relation `leq`:
 
@@ -96,45 +90,30 @@ isSame leq p q := leq p q ∧ leq q p
 
 This is comparison in both directions. It is not Lean equality, and it is not defined to be alpha-beta-eta conversion. A concrete order can recognize additional propositional relationships.
 
-### OrderAlgebra: give comparison an algebraic interpretation
+### Constructor compatibility, without logical identities
 
-`OrderAlgebra leq` supplies an ortholattice `Carrier` and a function `eval : Expr → Carrier`, with:
+`ExprRel` is an expression relation. `RelationCongruence` requires preservation of
+equivalence under implication and under equality of individual terms. These are
+the two constructors needed by the correspondence proof. Other constructors
+could be added, but are unnecessary: cuts and structural weakening handle larger
+contexts. It imposes no logical identities. The diagonal relation satisfies it.
 
-```text
-leq p q ↔ eval p ≤ eval q
-```
+The proof systems supply structural weakening and logical rules themselves.
+Their correspondence uses cuts with matched hypotheses to replace formulas in
+contexts. It does not assume that adding context members gives a comparison
+between encoded sequents.
 
-The remaining fields specify the interpretation of truth, falsity, conjunction, disjunction, negation, implication, and equivalence. In particular, implication is interpreted as `eval pᶜ ⊔ eval q`.
+### The checker supplies positive tests
 
-Antisymmetry belongs to the carrier, not to expression syntax. Different expressions can have the same interpretation. The theorem `OrderAlgebra.same_iff` makes this precise:
+[Checker/Interfaces.lean](Checker/Interfaces.lean) defines `Test P`: a Boolean
+and a proof that success implies `P`. `Testable P` supplies such a test.
+For expression comparisons the implementation calls the memoized OL pipeline.
+For sorting and freshness, ordinary decidable tests suffice.
 
-```text
-isSame leq p q ↔ eval p = eval q
-```
-
-The file derives a preorder on expressions and the sequent encoding, weakening, and truth laws from this interpretation. It does not derive a decision procedure or an expression reducer from the algebra.
-
-### OrderReduction: a certified simplifier
-
-`OrderReduction leq` supplies:
-
-```text
-reduce : Expr → Expr
-isSame leq (reduce p) p
-(reduce p).sort = p.sort
-```
-
-The interface does not require complete normalization, canonical forms, or idempotence. It only requires preservation of comparison in both directions and of the computed sort.
-
-`reducedSame leq p q` means literal equality of `reduce p` and `reduce q`. With transitivity, `OrderReduction.sound` proves:
-
-```text
-reducedSame leq p q → isSame leq p q
-```
-
-The converse is not required. A reducer may fail to make two equivalent expressions literally equal.
-
-Other useful results are `leq_iff` (reducing both sides preserves a comparison), `monotone`, and, under `OrderAlgebra`, `value_reduce`. The `map_and`, `map_or`, and `map_neg` theorems express compatibility up to `isSame`, not syntactic equality of the resulting expressions.
+The relation in certificates, `Imported.Checker.ProofRelation`, is defined
+using Ordered αβη derivations and contextual equivalence. Its transitivity is
+proved by composing derivations; transitivity of algorithmic acceptance is not
+assumed. A rejected comparison is not a disproof of the relation.
 
 ### Matching formulas and contexts
 
@@ -144,15 +123,14 @@ These predicates describe different strengths of matching. Their differences mat
 |---|---|
 | `ordContains leq p Γ` | Some member of `Γ` is order-equivalent to `p`. |
 | `setLeq leq Γ Δ` | Every member of `Γ` has an order-equivalent member in `Δ`. |
-| `reducedSubset leq Γ Δ` | Every member of `Γ` has a member of `Δ` with literally equal reduced syntax. |
-| `containedExcept leq Γ Δ p` | Every member of `Γ` either matches a member of `Δ` by reduced equality or is order-equivalent to `p`. |
-| `containedExceptEither leq Γ Δ p q` | Every member of `Γ` is literally in `Δ`, or is order-equivalent to `p` or `q`. |
+| `containedExcept leq Γ Δ p` | Every member of `Γ` is order-equivalent to a member of `Δ` or to `p`. |
+| `containedExceptEither leq Γ Δ p q` | Every member of `Γ` is order-equivalent to a member of `Δ`, to `p`, or to `q`. |
 
-In particular, `setLeq` is inclusion **up to equivalence**, not pointwise one-way inequality. And `containedExceptEither` uses literal membership for retained formulas; it is not just two copies of `containedExcept`.
+In particular, `setLeq` is inclusion **up to equivalence**, not pointwise one-way inequality. Both exception predicates use the same equivalence for retained and principal formulas.
 
 Example: if the premise contains `{a, b, c}` and the conclusion retains `{c}`, then `containedExceptEither … {a,b,c} {c} a b` permits removing the two principal formulas. It would not permit silently dropping an unrelated `d`.
 
-The lemmas at the end of the file turn ordinary subset or set-difference facts into these predicates. `setLeq_of_reducedSubset` uses the soundness of reduction and requires transitivity.
+The lemmas at the end of `Order.lean` turn ordinary subset or set-difference facts into these predicates using reflexivity. The checker composes positive equivalence tests to establish these conditions.
 
 ### Comparing whole sequents
 
@@ -174,32 +152,16 @@ sequentLeq leq Γ Δ Γ' Δ'
 
 This compares the entire sequent formula. It is different from matching the two contexts member by member.
 
-The finite-set encodings are `noncomputable`, because they use `Finset.toList`. `listSequentToFormula` instead works directly on the input lists. `SequentEncoding` says that either encoding gives the same comparisons, on both sides of `leq`; it accounts for permutation and duplicate removal.
+The finite-set encodings are `noncomputable` because they use `Finset.toList`.
+[Checker/Encoding.lean](Checker/Encoding.lean) defines `listSequentToFormula`
+on input lists and proves `listSequent_same`: for well-sorted inputs, the list
+and finite-set formulas are equivalent in `ProofRelation`. This is proved
+using logical rules, including permutation and duplicate removal.
 
-Under `OrderAlgebra`, `value_sequent` identifies the interpretation as:
-
-```text
-(infimum of the antecedent interpretations)ᶜ
-  ⊔ (supremum of the succedent interpretations)
-```
-
-This explains `SequentWeakening`: adding assumptions or adding alternatives makes the encoded sequent greater in the order. `SequentTruth` says every encoded sequent lies below `top`; it does not say every sequent is true or derivable.
-
-### Which assumptions are bundled together?
-
-| Interface | What it provides |
-|---|---|
-| `SequentEncoding` | Agreement of list and finite-set encodings under comparison. |
-| `SequentWeakening` | Memberwise equivalent inclusion implies whole-sequent comparison. |
-| `SequentTruth` | Every encoded sequent compares below `top`. |
-| `TermEqualityCongruence` | Replacing individual terms by order-equivalent terms preserves equality formulas up to `isSame`. |
-| `CheckerOrder` | Sequent encoding, reduction, and decidable comparison. |
-| `ImportOrder` | Reduction, reflexivity, and the sequent truth bound. |
-| `ProofOrder` | `ImportOrder`, a preorder, sequent weakening, and term-equality congruence. |
-
-The `.of` definitions package separately supplied instances into these bundles.
-
-**`ProofOrder` does not extend `CheckerOrder`.** One supplies laws for proof translations; the other supplies operations for executable checking. An executable comparison need not itself be transitive. Its positive answers can instead be justified in a stronger reference relation later.
+The generic proof systems still permit arbitrary expression relations.
+`ProofOrder` is only a convenience bundle of a preorder and
+`RelationCongruence`, used where these laws are needed. The checker separately
+supplies the particular relation justified by Ordered αβη proofs.
 
 ## 3. Ordered: explicit logical rules with order-based structural steps
 
@@ -209,25 +171,28 @@ Source: [Ordered.lean](Ordered.lean).
 
 `SubstPair` contains a `source` and a `target` expression. `wellSorted` requires the source to be well-sorted and both computed sorts to agree.
 
-`SubstPair.liftEq` expresses the relationship needed to substitute one expression for the other. It applies function or predicate expressions to fresh variables, compares their results, and universally quantifies those variables. Examples, schematically:
+`SubstPair.pointwiseEq` expresses the relationship needed to substitute one expression for the other. It applies both expressions to explicitly supplied fresh variables and compares their ground results. Examples, schematically:
 
 ```text
 s, t : ind         → s = t
 P, Q : prop        → P ↔ Q
-f, g : ind → ind   → ∀x. f x = g x
-P, Q : ind → prop  → ∀x. P x ↔ Q x
+f, g : ind → ind   → f x = g x
+P, Q : ind → prop  → P x ↔ Q x
+f, g : prop → prop → f p ↔ g p
 ```
 
-This constructs a formula; it does not assert that the formula is already proved. The substitution rules put such formulas among their assumptions.
+These comparison variables are free parameters, not quantified variables. They must be distinct within each argument list and absent from the compared expressions' free variables. A second proof premise supplies the comparison, or the conjunction of comparisons for a batch. Its remaining assumptions and conclusions must also be free of these parameters.
 
-`SubstContext` contains named parameters and a formula body, for example parameters `[P]` and body `P a`. `instantiate` simultaneously substitutes arguments for the parameters using Lisa's named substitution. Repeated parameters use their last replacement. `fits` checks the list of argument sorts against the parameters, including arity. `wellSorted` checks the body and the allowed functional/predicate parameter sorts.
+`SubstContext` contains named parameters and a formula body, for example parameters `[P]` and body `P a`. `instantiate` simultaneously substitutes arguments for the parameters using Lisa's named substitution. Repeated parameters use their last replacement. `fits` checks the list of argument sorts against the parameters, including arity.
+
+`SubstRule` bundles these data with a comparison-variable list for each pair. Its `source` and `target` are the instantiated formulas, and `equation` is the conjunction required in the second premise. `valid` checks sorting and the comparison parameters; `fresh` checks the second premise's residual contexts. Parameters may have any simple sort. The checker exposes these rules through both its in-memory API and binary tags 33 and 34; see [the binary format](Checker/BINARY_FORMAT.md). The old one-premise tags 24 and 25 remain explicitly rejected.
 
 ### The proof tree
 
 `Ordered.ProofTree leq Γ Δ` includes two structural operations:
 
-- `weakening`: transport a proof when the old whole-sequent formula compares below the new one.
-- `restate`: transport a proof when those formulas compare in both directions.
+- `weakening`: add formulas to either context using ordinary subset inclusion.
+- `restateWeaken`: transport a proof when the old whole-sequent formula compares below the new one. This also covers equivalent sequents; no separate `restate` constructor is needed.
 
 The other constructors specify exact shapes of premise and conclusion contexts. For example, `leftAnd` is:
 
@@ -250,28 +215,28 @@ The rule families are:
 | `leftExists`, `rightForall` | Generalize using a variable satisfying a freshness condition. |
 | `rightEpsilon` | Replace a witness instance by the corresponding epsilon-choice instance. |
 | `leftRefl`, `rightRefl` | Remove a reflexive equality assumption or prove a reflexive equality. |
-| `leftSubstEq`, `rightSubstEq` | Replace expressions in a formula under the lifted equality/equivalence assumptions. |
+| `leftSubst`, `rightSubst` | Replace expressions simultaneously using a second premise proving their pointwise comparisons. |
 | `instSchema` | Apply a well-sorted named substitution to the entire sequent. |
 
 The quantifier rules here explicitly require the quantified variable to have sort `ind`. The richer function and predicate sorts also occur in schematic substitution.
 
 For a first pass, read `hypothesis`, `cut`, `leftAnd`, `rightImp`, and one quantifier rule in full. Then read the equality/substitution rules. The remaining connective rules follow the same style.
 
-## 4. Standard: the same logical rules with literal weakening
+## 4. AlphaBetaEtaOrder: the alpha-beta-eta baseline
 
-Source: [Standard.lean](Standard.lean).
+Source: [AlphaBetaEtaOrder.lean](AlphaBetaEtaOrder.lean).
 
-`Standard.ProofTree Γ Δ` has no `leq` parameter. It uses the same logical, quantifier, equality, epsilon, and schema-instantiation rules, but its weakening constructor requires:
+`Ordered.AlphaBetaEtaProof Γ Δ` abbreviates `Ordered.ProofTree AlphaBetaEta Γ Δ`.
+It has exactly the Ordered rules, with alpha-beta-eta conversion as the auxiliary
+comparison relation. `AlphaBetaEta` is symmetric, so a comparison step identifies
+the two encoded sequent formulas up to conversion.
 
-```text
-Γ ⊆ Γ'    and    Δ ⊆ Δ'
-```
+The file supplies the preorder and equality/implication congruence instances.
+The relation is defined independently of normalization; the Lambda package
+decides it on well-sorted expressions.
 
-There is no `restate` constructor. Formula identification and arbitrary whole-sequent comparisons are not built into its structural rule.
-
-For example, extending a proof of `a ⊢ a` to `a,b ⊢ a,c` is directly available by weakening. Replacing `a` by a differently written order-equivalent expression is not justified by that constructor alone.
-
-This file defines a proof system, not a theorem that every accepted expression comparison is admissible in that system. That distinction explains the hypothesis required in the next translation file.
+This baseline replaces the former Standard calculus, which had no conversion
+rule. No equivalence with that removed calculus is asserted.
 
 ## 5. Weakened: put context flexibility into each rule
 
@@ -286,7 +251,7 @@ The name describes relaxed requirements on the shape of contexts. It does not me
 Instead of requiring the premise to be literally `Γ,a,b ⊢ Δ`, `Weakened.leftAnd` accepts a proof of arbitrary `Γ₁ ⊢ Γ₂` and a proposed conclusion `Ω₁ ⊢ Ω₂`, provided:
 
 1. All contexts and principal formulas are well-sorted.
-2. `reducedSubset leq Γ₂ Ω₂`: the right-side formulas are retained up to reduced equality.
+2. `setLeq leq Γ₂ Ω₂`: the right-side formulas are retained up to equivalence.
 3. `containedExceptEither leq Γ₁ Ω₁ a b`: only the principal formulas may disappear from the left.
 4. `ordContains leq (a ∧ b) Ω₁`: the combined formula occurs on the left up to order-equivalence.
 
@@ -303,36 +268,36 @@ Thus a single rule can include extra weakening and replacement of a principal fo
 - `instSchema` permits memberwise order-equivalent inclusion after instantiation.
 - `restateTrue` introduces a sequent whose entire formula is order-equivalent to `top`.
 
-The last rule is a convenience of this presentation. `OrderedWeakened` derives it from rules already in `Ordered`, under `ProofOrder`.
+The last rule is a convenience of this presentation. `OrderedWeakened` derives it directly from `Ordered.rightTrue` and restatement, without assumptions on the relation. Both systems also have an explicit `leftFalse` rule.
 
-`Weakened.ProofTree` itself only requests `OrderReduction` in addition to the relation. The stronger laws needed to justify its equivalence with `Ordered` are requested by the translation, not by the datatype definition.
+`Weakened.ProofTree` itself requests only the relation. The laws needed to justify its equivalence with `Ordered` are requested by the translation, not by the datatype definition.
 
-## 6. StandardOrdered: a conditional equivalence
+## 6. OrderedComparison: compare two Ordered instances
 
-Source: [StandardOrdered.lean](StandardOrdered.lean).
+Source: [OrderedComparison.lean](OrderedComparison.lean).
 
-`standardToOrdered` recursively copies a Standard derivation. The logical constructors match; the only substantive change is converting literal subset weakening to whole-sequent weakening. It needs reflexivity and `SequentWeakening`.
-
-The reverse function, `orderedToStandard`, needs:
+`Ordered.Admissible source target` asks only for two-formula derivations:
 
 ```lean
-SequentLeqClosedByStandard leq
+∀ a b, isFormula a → isFormula b → source a b → ProofTree target {a} {b}
 ```
 
-This is a function supplying a Standard derivation of the new sequent whenever there is a Standard derivation of the old one and a whole-sequent comparison between them, with the required sorting evidence.
+`Ordered.translate` recursively copies logical rules. For a comparison step,
+it packs the premise into its formula `A`, uses admissibility to obtain `A ⊢ B`,
+cuts, and unpacks `B` into the conclusion. `OrderedEncoding.lean` proves the
+packing and unpacking operations using logical rules, cut, and structural
+weakening, including empty contexts. No congruence or preorder is required.
+The translation is noncomputable because finite-set encodings choose list enumerations.
 
-In other words: **prove that order-based weakening is admissible in Standard before using this translation**. The function handles `Ordered.weakening` and `Ordered.restate` through this supplied proof; the remaining constructors are copied recursively.
+`Ordered.provable_iff` proves equivalence of the two instances under mutual
+admissibility. If `source` is included in `target`, `mapOrder` directly translates
+its comparison steps; this does not require two-formula admissibility.
+Then `provable_iff_of_simulation` needs only reverse two-formula admissibility.
 
-The main theorem is:
-
-```text
-Nonempty (Standard.ProofTree Γ Δ)
-  ↔ Nonempty (Ordered.ProofTree leq Γ Δ)
-```
-
-under reflexivity, `SequentWeakening`, and `SequentLeqClosedByStandard leq`.
-
-It is not an unconditional equivalence for every ortholattice interpretation. The source explicitly notes an obstruction to assuming this automatically: Standard has no introduction rule for the literal truth constant, whereas the algebra interprets that constant as truth.
+For the checker's `ProofRelation`, `of_alphaBetaEta` embeds conversion and
+`admissible` supplies the reverse two-formula derivations. Both are proved in
+[Checker/ProofRelation.lean](Checker/ProofRelation.lean). This completes the
+translation to the αβη baseline.
 
 ## 7. OrderedWeakened: expand flexible rules into explicit derivations
 
@@ -346,7 +311,7 @@ This is the largest file in the group because it handles each constructor in bot
 orderedToWeakened
 ```
 
-requires reflexivity and `OrderReduction`. An exact rule application satisfies the flexible rule's checks: a retained formula matches itself, and a principal formula is equivalent to itself. Binary `leftOr` and `rightAnd` become two-element lists of premises.
+requires only reflexivity. An exact rule application satisfies the flexible rule's checks: a retained formula matches itself, and a principal formula is equivalent to itself. Binary `leftOr` and `rightAnd` become two-element lists of premises.
 
 ### Weakened to Ordered
 
@@ -354,7 +319,7 @@ requires reflexivity and `OrderReduction`. An exact rule application satisfies t
 weakenedToOrdered
 ```
 
-requires `ProofOrder`. Its recurring construction is:
+requires only `[Std.Refl leq]` and `[RelationCongruence leq]`. Transitivity is not needed. Its recurring construction is:
 
 1. Translate the premise derivations recursively.
 2. Weaken their contexts into the exact shape required by an Ordered rule.
@@ -369,17 +334,15 @@ For `leftAnd`, this means turning the premise into:
 
 then using the strict rule to obtain `Ω₁,a ∧ b ⊢ Ω₂`, and finally matching `a ∧ b` with its equivalent occurrence already present in `Ω₁`.
 
-Each part of `ProofOrder` has a concrete job:
+The required assumptions have these jobs:
 
 | Law | Use in the translation |
 |---|---|
 | Reflexivity | Preserve unchanged formulas. |
-| Transitivity and reduction preservation | Turn equal reduced forms into order-equivalence. |
-| `SequentWeakening` | Convert memberwise matching into structural proof steps. |
-| `SequentTruth` | Help derive `restateTrue` from the hypothesis `top ⊢ top`. |
-| `TermEqualityCongruence` | Justify the generalized reflexivity rules involving equivalent terms `s,t`. |
+| `RelationCongruence.imp_congr` | Derive a matched hypothesis by restatement; cut then replaces context members. |
+| `RelationCongruence.eq_congr` | Justify the generalized reflexivity rules involving equivalent terms `s,t`. |
 
-The helper section follows these needs. It establishes context-matching facts, sorting facts, and `orderedWellSorted`; the private `weaken` combines them. `foldLeftOrOrdered` and `foldRightAndOrdered` expand nonempty premise lists into repeated binary rules. `restateTrueOrdered` derives the convenience truth rule.
+The helper section follows these needs. `sameHypothesis` derives a matched hypothesis by restatement. `clearLeft` and `clearRight` use cuts to replace context members; the private `replaceContexts` combines them with ordinary structural weakening. This proof-producing translation uses classical choice to select witnesses from matching propositions. The executable checker does not run this translation. `foldLeftOrOrdered` and `foldRightAndOrdered` expand nonempty premise lists into repeated binary rules. `restateTrueOrdered` derives the convenience truth rule. Basic sorting lemmas are shared with `OrderedEncoding` through [Sorting.lean](Sorting.lean).
 
 The final theorem, `ordered_eq_weakened`, states:
 
@@ -388,7 +351,7 @@ Nonempty (Ordered.ProofTree leq Γ Δ)
   ↔ Nonempty (Weakened.ProofTree leq Γ Δ)
 ```
 
-under `ProofOrder leq`. This establishes equivalence of these two presentations for that order. It does not remove the separate admissibility requirement for translation to Standard.
+under reflexivity and `RelationCongruence leq`. This establishes equivalence of these two presentations for that relation. It does not remove the separate admissibility requirement for translation to the alpha-beta-eta baseline.
 
 For reading the proof, inspect one ordinary case (`leftAnd`), a multi-premise case (`leftOr`), an eigenvariable case (`rightForall`), and an equality case (`rightRefl`). These expose the main reasons for the supporting lemmas.
 
@@ -396,25 +359,23 @@ For reading the proof, inspect one ordinary case (`leftAnd`), a multi-premise ca
 
 Source: [OrderSimulation.lean](OrderSimulation.lean).
 
-The previous translations keep the same relation and change the presentation of derivations. `OrderSimulation source target` instead relates **two comparison relations**, each with its own reducer.
+The previous translations keep the same relation and change the presentation of derivations. `Subrelation source target` instead relates **two comparison relations**.
 
-It requires two implications:
+This is Lean's existing relation-inclusion predicate, requiring one implication:
 
 ```text
 source p q                 → target p q
-reducedSame source p q     → reducedSame target p q
 ```
 
-The first says every positive comparison made by the source is also valid in the target. The second preserves exact reduced matches used by the rules. The second is a separate requirement: target equivalence alone does not imply literal equality of the target reducer's outputs.
+Every positive comparison made by the source must also be valid in the target. There is no requirement concerning reduction algorithms.
 
-The file lifts these implications to each matching predicate:
+The file lifts this implication to each matching predicate:
 
 | Theorem | Transfers |
 |---|---|
 | `same` | Bidirectional expression comparison. |
 | `sequent` | Whole-sequent comparison. |
 | `member`, `members` | Equivalent membership and inclusion. |
-| `reducedSubset` | Inclusion using equal reduced forms. |
 | `except`, `exceptEither` | The principal-formula exception checks. |
 
 `refl` supplies the identity simulation.
@@ -425,11 +386,14 @@ This is the interface needed to justify a limited executable comparison against 
 
 ## How the pieces fit after Lambda
 
-Lambda normalization handles equality of expressions under alpha-beta-eta conversion. This layer describes how an expression comparison and a sort-preserving reducer can be used inside sequent proofs. It does not hard-code the Lambda normalizer into `OrderReduction`.
+Lambda normalization handles αβη conversion. `Orthologic.Expression` lowers
+those canonical terms into the OL syntax, normalizes recursively, then compares
+the results. `Orthologic.Cached` implements exactly the same operations with
+verified memoization. Soundness is proved directly in Ordered αβη.
 
-Later, [Combined/Lambda.lean](Combined/Lambda.lean) connects lambda normalization to an order, while the other Combined modules add further comparison and simplification capabilities.
-
-For continuing toward executable proof checking, read [Imported.lean](Imported.lean), [ImportedWeakened.lean](ImportedWeakened.lean), [CheckerData.lean](CheckerData.lean), and [Checker.lean](Checker.lean). The interfaces and translation distinctions above are the prerequisites for understanding what their correctness statements guarantee.
+For the executable layer, read [the checker guide](Checker/README.md), followed
+by the files below. The previous Combined and Quantified alternatives and
+matching policies are preserved only in the archive.
 
 ## Part II: imported proofs and the executable checker
 
@@ -439,21 +403,22 @@ Read:
 
 1. [Imported.lean](Imported.lean)
 2. [ImportedWeakened.lean](ImportedWeakened.lean)
-3. [CheckerData.lean](CheckerData.lean)
-4. [Checker.lean](Checker.lean)
-5. [CheckerDisplay.lean](CheckerDisplay.lean)
-6. [Binary.lean](Binary.lean)
+3. The [Orthologic pipeline and soundness proofs](Orthologic/REORGANIZATION_PLAN.md)
+4. [Checker/ProofRelation.lean](Checker/ProofRelation.lean)
+5. [Checker/Encoding.lean](Checker/Encoding.lean)
+6. [Checker/Interfaces.lean](Checker/Interfaces.lean)
+7. [Checker/Data.lean](Checker/Data.lean)
+8. [Checker/Check.lean](Checker/Check.lean)
+9. [Checker/Soundness.lean](Checker/Soundness.lean)
+10. [Checker/Display.lean](Checker/Display.lean)
+11. [Checker/Binary.lean](Checker/Binary.lean)
 
-Their dependencies are:
+Import `Lisa.Checker` to load the whole package. `Imported` and
+`ImportedWeakened` remain independent proof-system modules.
 
-```text
-Weakened → Imported ───────────────→ CheckerData → CheckerDisplay
-               │                         │              │
-               v                         v              │
-OrderSimulation → ImportedWeakened ───→ Checker ─────────┤
-                                                       v
-                                                     Binary
-```
+The executable tests use the cached OL functions. Their soundness is interpreted
+through `ProofRelation`; the final certificate theorem combines the
+Imported–Weakened and Weakened–Ordered translations with `Ordered.translate`.
 
 The execution path goes in the opposite direction to this reading order:
 
@@ -529,6 +494,8 @@ The justification's own dependencies are retained. In particular, assuming `T` a
 
 The logical rules follow `Weakened`, with dependency bookkeeping added:
 
+`Imported` omits the redundant `restate` constructor: `weakening` already accepts the forward comparison. The checker still checks both comparisons for a `restate` instruction, then constructs a `weakening` certificate. Constructors also omit sorting assumptions for premise sequents, since their proofs already guarantee sorting; conclusion and principal-expression sorting remain explicit. The multi-premise conjunction and disjunction rules use the shared `foldFormulas` definition.
+
 - Rules with no premises, such as `hypothesis` and `rightRefl`, have empty dependencies.
 - Ordinary one-premise rules preserve their premise's dependencies.
 - Two-premise rules take the union of their dependencies.
@@ -551,7 +518,7 @@ The main construction explains why keeping track of imports is sufficient: if ev
 `resolveWith` takes:
 
 1. An `Imported.ProofTree` using a source order.
-2. An `OrderSimulation` from that order to a target order.
+2. A `Subrelation source target` proof of relation inclusion.
 3. A `Weakened` proof in the target order for each outstanding assumption.
 
 It produces a `Weakened` proof of the original conclusion in the target order.
@@ -575,15 +542,15 @@ Nonempty (Weakened.ProofTree leq Γ Δ)
   ↔ Nonempty (Imported.ProofTree leq Γ Δ ∅)
 ```
 
-Thus adding assumed sequents and discharge does not add new closed consequences relative to the same Weakened system. This theorem only needs the reduction interface already required by the proof datatypes; it does not need `ProofOrder`.
+Thus adding assumed sequents and discharge does not add new closed consequences relative to the same Weakened system. This theorem needs no additional laws on the relation and no reducer.
 
-`withAssumptions_iff` generalizes the result to a prescribed finite set `ss`, assuming proofs of all its sequents and `ImportOrder leq`. In the reverse direction it must attach exactly that set of dependencies to an existing proof. The helper `assumeAll` constructs a derivation of truth carrying those dependencies; discharging an import-free proof with it attaches them.
+`withAssumptions_iff` generalizes the result to a prescribed finite set `ss`, assuming proofs of all its sequents and reflexivity of `leq`. In the reverse direction it must attach exactly that set of dependencies to an existing proof. The helper `assumeAll` constructs a derivation of truth carrying those dependencies; discharging an import-free proof with it attaches them.
 
 The dependency set is therefore a recorded set of obligations, not a claim that each obligation is logically indispensable.
 
 ## 11. CheckerData: executable statements and certified results
 
-Source: [CheckerData.lean](CheckerData.lean).
+Source: [Checker/Data.lean](Checker/Data.lean).
 
 ### Why statements use lists
 
@@ -595,11 +562,13 @@ structure Statement where
 
 A `Statement` preserves the order and repetitions in the input representation. Its `sequent` converts both lists to finite sets for the proof system. Its `formula` computes the whole-sequent encoding directly from the lists.
 
-This avoids computing an arbitrary enumeration of a finite set. The `SequentEncoding` laws established earlier justify deciding abstract sequent comparisons through these executable list formulas.
+This avoids computing an arbitrary enumeration of a finite set.
+`Statement.same_formula` proves equivalence between the executable encoding and
+the abstract encoding for sorted inputs, using `Checker/Encoding.lean`.
 
-`Statement.decideLeq`, `decideSame`, and `decideTrue` construct decision procedures for whole-sequent inequality, equivalence, and equivalence to truth. Each transports the decision on list formulas to the proposition about finite-set sequents.
-
-`value_formula` gives the corresponding equality of interpretations when an `OrderAlgebra` is available.
+`Statement.testLeq`, `testSame`, and `testTrue` produce positive tests for
+whole-sequent implication, equivalence, and equivalence to truth. Only successes
+are transported into the proof system; failures carry no logical conclusion.
 
 ### A successful result carries a certificate
 
@@ -625,14 +594,14 @@ Keeping assumptions as `Statement`s allows executable comparisons during dischar
 | `emptyProof` | No final step exists. |
 | `invalidReference` | A referenced step or external import is unavailable. |
 | `illSortedConclusion` | A conclusion contains a non-formula. |
-| `invalidConditions` | A rule's required conditions fail. |
+| `invalidConditions` | The checker did not establish a required condition. |
 | `wrongConclusion` | Closed checking did not obtain the requested sequent. |
 | `unresolvedAssumptions` | Closed checking found remaining obligations. |
 | `atStep` | Attach the step index to another error. |
 
 ## 12. Checker: from linear records to certified derivations
 
-Source: [Checker.lean](Checker.lean).
+Source: [Checker/Check.lean](Checker/Check.lean).
 
 ### Input records are not proofs yet
 
@@ -657,21 +626,17 @@ Local references are looked up only in the array of already checked results. An 
 
 External statements are initially checked as `assume` steps. They are available as premises, but their sequents remain obligations whenever used.
 
-### Deciding the rule conditions
+### Testing the rule conditions
 
-The first part of the file implements decisions for sorting and the matching predicates from `Order.lean`. Reduced context matching first tries literal inclusion and, where needed, prepares reduced contexts so that the target is not repeatedly normalized for each source formula.
+The checker uses the single αβη/OL pipeline for both formula matching and
+whole-sequent comparison. Literal equality is a cheap sufficient match;
+otherwise `Cached.isSame` compares normalized forms. One-way sequent weakening
+uses `Cached.isImplying`.
 
-These optimizations still return `Decidable` values for the specified propositions. A successful branch supplies the evidence needed by the corresponding Imported constructor.
-
-### Matching with a cheaper relation
-
-`Matching target` packages a source relation, its reducer and decision procedure, and an `OrderSimulation source target`.
-
-`checkStepMatching` uses that source for rule matches and transfers successes into the target relation. Whole-sequent checks remain in the target relation. `Matching.exact` uses the target itself, with the identity simulation.
-
-`checkStepFallback` retries using exact target matching if cheap checking returns `invalidConditions`. It does not retry arbitrary errors such as invalid references. Here “exact” means using the supplied target comparison, not completeness for all logical consequences.
-
-The theorem `checkStepFallback_exact` proves that selecting the identity matching policy gives the same result as ordinary `checkStep`.
+`verify P` returns a `Test P`. Its `sound` field provides evidence for `P` only
+when the Boolean is true. Compound tests handle conjunction, disjunction and
+finite context membership. This avoids claiming decidability of provability.
+There is no source/target matching selection or fallback backend.
 
 ### What a successful step does
 
@@ -679,14 +644,18 @@ For each rule, the checker:
 
 1. Checks that the proposed conclusion consists of formulas.
 2. Retrieves the required checked premises.
-3. Decides the rule-specific sorting, freshness, matching, and context conditions.
+3. Tests the rule-specific sorting, freshness, matching, and context conditions.
 4. Builds a `Checked` result whose certificate applies the corresponding Imported proof constructor.
 
 For example, a `leftAnd` record names a premise and formulas `a,b`. Its successful branch establishes the same preservation and principal-formula conditions described in the Weakened section, then uses `Imported.ProofTree.leftAnd` with the premise certificate. Its dependencies are inherited from that premise.
 
 An `assume` step succeeds for a well-sorted conclusion but returns that conclusion as an outstanding assumption. This is intentional: success means the record has the claimed derivation with the recorded obligations.
 
-Discharge computes the remaining assumptions by filtering against the justification's conclusion, then unions the justification's dependencies. It also verifies that the proposed output is equivalent to the premise conclusion. The returned statement is the premise's actual statement, rather than silently replacing it with the proposed spelling.
+Discharge removes only assumptions whose equivalence to the justification's
+conclusion was established by `Statement.testSame`, then unions the
+justification's dependencies. Unrecognized assumptions remain recorded.
+`Imported.ProofTree.weakenAssumptions` justifies retaining them even if the
+semantic relation could discharge more. It also verifies that the proposed output is equivalent to the premise conclusion. The returned statement is the premise's actual statement, rather than silently replacing it with the proposed spelling.
 
 ### Checking a whole proof versus checking a closed proof
 
@@ -705,15 +674,19 @@ The output `ClosedChecked leq target` carries a certificate for precisely that t
 
 ### Using the certificate
 
-`Checked.resolve` produces a Weakened derivation once proofs of all remaining assumptions are supplied. `Checked.resolveWith` additionally allows transfer to a different relation using `OrderSimulation`.
+`Checked.resolve` produces a Weakened derivation once proofs of all remaining
+assumptions are supplied. `Checked.resolveWith` additionally allows transfer
+along a `Subrelation` proof. The public `Checked.sound` theorem goes further:
+given Ordered αβη proofs of the assumptions, it yields an Ordered αβη proof of
+the conclusion. `ClosedChecked.sound` needs no assumptions.
 
 `ClosedChecked.resolveWith` needs no imported proofs because its dependency set is empty. It yields a Weakened proof in the target relation.
 
-These guarantees are relative to the specified relation. To continue to `Ordered`, use `ProofOrder` and the earlier translation. To continue to `Standard`, the separate Standard admissibility condition is still required. Executable checking does not remove those obligations.
+These guarantees are relative to the specified relation. To continue to `Ordered`, use `ProofOrder` and the earlier translation. To continue to the alpha-beta-eta baseline, reverse admissibility in that Ordered instance is still required. Executable checking does not remove those obligations.
 
 ## 13. CheckerDisplay: readable failure diagnostics
 
-Source: [CheckerDisplay.lean](CheckerDisplay.lean).
+Source: [Checker/Display.lean](Checker/Display.lean).
 
 This small file renders expressions and statements for human inspection:
 
@@ -727,7 +700,7 @@ This is diagnostic output, not a serialization format or an additional proof che
 
 ## 14. Binary: decode external data and invoke the checker
 
-Source: [Binary.lean](Binary.lean).
+Source: [Checker/Binary.lean](Checker/Binary.lean).
 
 The binary layer turns two input streams—an expression table and proof records—into certified checker results.
 
@@ -761,7 +734,7 @@ Thus byte reading and step processing are incremental, but the implementation st
 
 ### What is certified at the boundary?
 
-A successful binary check returns the same kind of `Checked` value as the in-memory checker. Its Lean certificate concerns the decoded conclusion and its recorded assumptions under the chosen order.
+A successful binary check returns the same kind of `Checked` value as the in-memory checker. Its Lean certificate concerns the decoded conclusion and its recorded assumptions, and is sound in `Ordered AlphaBetaEta`.
 
 This is distinct from a separate formal specification of the external producer's file format. The certificate establishes derivability of the expressions actually decoded and checked; the decoder determines how bytes are interpreted.
 

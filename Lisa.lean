@@ -3,7 +3,11 @@
 import Lisa.Basic
 import Lisa.Syntax
 import Lisa.Ordered
-import Lisa.Standard
+import Lisa.AlphaBetaEtaOrder
 import Lisa.Weakened
 import Lisa.OrderedWeakened
-import Lisa.StandardOrdered
+import Lisa.OrderedComparison
+import Lisa.Orthologic.ExpressionSoundness
+import Lisa.Orthologic.CachedSoundness
+import Lisa.Checker
+import Lisa.SCLambdaToPure

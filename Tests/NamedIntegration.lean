@@ -1,4 +1,4 @@
-import Lisa.Lambda.NamedConversion
+import Lisa.Lambda.NamedDecision
 
 namespace Lisa.Tests.NamedIntegration
 
@@ -10,15 +10,15 @@ private def y1 : SVar := ⟨⟨"y", 1⟩, prop⟩
 private def xInd : SVar := ⟨x.id, ind⟩
 private def f : Expr := .var ⟨⟨"f", 0⟩, prop >> prop⟩
 
-private def typed (e : Expr) := interpretNamed e (Names.free : Names [])
+private def typed (e : Expr) := interpretNamed e (Names.free : Names)
 
 #guard typed (.var x) = some ⟨prop, .free x.id⟩
-#guard typed (.lam x (.var x)) = some ⟨prop >> prop, .lam (.bound .here)⟩
+#guard typed (.lam x (.var x)) = some ⟨prop >> prop, .lam prop (.bound 0)⟩
 #guard typed (.lam x (.lam x (.var x))) =
-  some ⟨prop >> prop >> prop, .lam (.lam (.bound .here))⟩
+  some ⟨prop >> prop >> prop, .lam prop (.lam prop (.bound 0))⟩
 #guard typed (.lam x (.lam y (.var x))) =
-  some ⟨prop >> prop >> prop, .lam (.lam (.bound (.there .here)))⟩
-#guard typed (.lam xInd (.var x)) = some ⟨ind >> prop, .lam (.free x.id)⟩
+  some ⟨prop >> prop >> prop, .lam prop (.lam prop (.bound 1))⟩
+#guard typed (.lam xInd (.var x)) = some ⟨ind >> prop, .lam ind (.free x.id)⟩
 #guard typed (.app (.var x) (.var y)) = none
 #guard typed (.app f (.var xInd)) = none
 #guard typed (.lam x (.app f (.var xInd))) = none
@@ -27,7 +27,7 @@ private def typed (e : Expr) := interpretNamed e (Names.free : Names [])
 private def capture := Expr.substOne x (.var y) (.lam y (.var x))
 
 #guard capture = .lam y1 (.var y)
-#guard typed capture = some ⟨prop >> prop, .lam (.free y.id)⟩
+#guard typed capture = some ⟨prop >> prop, .lam prop (.free y.id)⟩
 #guard typed capture ≠ typed (.lam y (.var y))
 
 /-- Freshening an outer binder must also avoid capture by a nested binder of that fresh name. -/
@@ -58,7 +58,7 @@ private def singleCheck (x : SVar) (body arg : Expr) : Bool :=
   | some ⟨s, a⟩ =>
       if h : s = x.sort then
         typed (Expr.substOne x arg body) ==
-          (interpretNamed body ((Names.free : Names []).bind x)).map
+          (interpretNamed body ((Names.free : Names).bind x)).map
             (Packed.subst (Term.single (h ▸ a)))
       else true
 
@@ -75,38 +75,33 @@ private def samples : List Expr :=
 #guard samples.length = 18
 #guard [x, y, y1, xInd].all fun x =>
   samples.all fun body => samples.all fun arg => singleCheck x body arg
-#guard samples.all fun e => typed e == elaborate [] (e.toNameless [])
+#guard samples.all fun e => (typed e).map (fun p => p.1) == e.sort
 
-example (e : Expr) (σ : Subst) (η θ : Names Γ) (h : Represents σ η θ e.freeVars) :
+example (e : Expr) (σ : Subst) (η θ : Names) (h : Represents σ η θ e.freeVars) :
     interpretNamed (σ.subst e) η = interpretNamed e θ :=
   interpretNamed_namedSubst e σ η θ h
 
-example (x : SVar) (body arg : Expr) (η : Names Γ) (a : Term Γ x.sort)
+example (x : SVar) (body arg : Expr) (η : Names) (a : Term x.sort)
     (ha : interpretNamed arg η = some ⟨x.sort, a⟩) :
     interpretNamed (Expr.substOne x arg body) η =
       (interpretNamed body (η.bind x)).map (Packed.subst (Term.single a)) :=
   interpretNamed_substOne x body arg η a ha
 
-example (h : Conversion p q) (η : Names Γ) :
+example (h : AlphaBetaEta p q) (η : Names) :
     ResultEquiv (interpretNamed p η) (interpretNamed q η) :=
-  interpretNamed_conversion h η
+  interpretNamed_alphaBetaEta h η
 
-example : compareNameless [] ((Expr.app (.lam x (.lam y (.var x))) (.var y)).toNameless [])
-    (capture.toNameless []) = some true :=
-  compareNameless_of_conversion (.beta x (.lam y (.var x)) (.var y) rfl) rfl
+#guard compareNamed (.app (.lam x (.lam y (.var x))) (.var y)) capture = some true
+#guard compareNamed (.lam x (.app f (.var x))) f = some true
 
-example : compareNameless [] ((Expr.lam x (.app f (.var x))).toNameless [])
-    (f.toNameless []) = some true :=
-  compareNameless_of_conversion (.eta x f prop rfl (by decide)) rfl
-
-/-- Conversion still covers malformed bodies; the intrinsic boundary rejects both sides. -/
+/-- AlphaBetaEta still covers malformed bodies; the intrinsic boundary rejects both sides. -/
 example : ResultEquiv
     (typed (.app (.lam x (.app (.var x) (.var x))) (.var y)))
     (typed (.app (.var y) (.var y))) :=
-  interpretNamed_conversion (.beta x (.app (.var x) (.var x)) (.var y) rfl) Names.free
+  interpretNamed_alphaBetaEta (.beta x (.app (.var x) (.var x)) (.var y) rfl) Names.free
 
-example : ¬ Conversion (.var x) (.var y) :=
-  not_conversion_of_compareNameless_false rfl (by decide)
+example : ¬ AlphaBetaEta (.var x) (.var y) :=
+  ((compareNamed_false).mp (by decide)).2.2
 
 example : AlphaEq (.lam x (.var x)) (.lam y (.var y)) ↔
     typed (.lam x (.var x)) = typed (.lam y (.var y)) :=
@@ -116,8 +111,8 @@ example : AlphaEq (.lam x (.var x)) (.lam y (.var y)) ↔
 #print axioms interpretNamed_substOne
 #print axioms interpretNamed_alpha
 #print axioms alpha_iff_interpretNamed_eq
-#print axioms interpretNamed_conversion
-#print axioms compareNameless_of_conversion
-#print axioms not_conversion_of_compareNameless_false
+#print axioms interpretNamed_alphaBetaEta
+#print axioms compareNamed_true
+#print axioms compareNamed_false
 
 end Lisa.Tests.NamedIntegration

@@ -1,94 +1,57 @@
-import Lisa.Lambda.Elaboration
-import Lisa.Lambda.Substitution
+import Lisa.AlphaBetaEta
+import Lisa.Lambda.AlphaBetaEta
 
 /-! Interpret named syntax in sorted environments before comparing substitutions. -/
 
 namespace Lisa.Lambda
 
-abbrev Names (Γ : List LSort) := (x : SVar) → Term Γ x.sort
+abbrev Names  := (x : SVar) → Term x.sort
 
 namespace Names
 
-def free : Names Γ := fun x => .free x.id
+def free : Names := fun x => .free x.id
 
-def rename (η : Names Γ) (ρ : Ren Γ Δ) : Names Δ := fun x => (η x).rename ρ
+def rename (η : Names) (ρ : Ren) : Names := fun x => (η x).rename ρ
 
-def subst (η : Names Γ) (σ : Sub Γ Δ) : Names Δ := fun x => (η x).subst σ
+def subst (η : Names) (σ : Sub) : Names := fun x => (η x).subst σ
 
 /-- Bind the selected name and weaken every other interpretation. -/
-def bind (η : Names Γ) (x : SVar) : Names (x.sort :: Γ) := fun y =>
-  if h : y = x then h.symm ▸ (Term.bound Var.here : Term (x.sort :: Γ) x.sort)
-  else (η y).rename Var.there
 
-@[simp] theorem bind_self (η : Names Γ) (x : SVar) : η.bind x x = .bound .here := by
+def bind (η : Names) (x : SVar) : Names := fun y =>
+  if h : y = x then h.symm ▸ (Term.bound 0 : Term x.sort)
+  else (η y).rename (Ren.shift x.sort)
+
+@[simp] theorem bind_self (η : Names) (x : SVar) : η.bind x x = .bound 0 := by
   simp [bind]
 
-@[simp] theorem bind_other (η : Names Γ) (h : y ≠ x) :
-    η.bind x y = (η y).rename Var.there := by
+@[simp] theorem bind_other (η : Names) (h : y ≠ x) :
+    η.bind x y = (η y).rename (Ren.shift x.sort) := by
   simp [bind, h]
 
-theorem bind_rename (η : Names Γ) (ρ : Ren Γ Δ) (x : SVar) :
-    (η.rename ρ).bind x = (η.bind x).rename (Ren.lift ρ) := by
+theorem bind_rename (η : Names) (ρ : Ren) (x : SVar) :
+    (η.rename ρ).bind x = (η.bind x).rename (Ren.lift x.sort ρ) := by
   funext y
   by_cases h : y = x
   · subst y; simp [rename, Term.rename]
-  · simp only [bind_other _ h, rename, Term.rename_comp]
-    rfl
+  · simp only [bind_other _ h, rename, Term.rename_comp, Ren.lift_shift]
 
-theorem bind_subst (η : Names Γ) (σ : Sub Γ Δ) (x : SVar) :
-    (η.subst σ).bind x = (η.bind x).subst (Sub.lift σ) := by
+theorem bind_subst (η : Names) (σ : Sub) (x : SVar) :
+    (η.subst σ).bind x = (η.bind x).subst (Sub.lift x.sort σ) := by
   funext y
   by_cases h : y = x
   · subst y; simp [subst, Term.subst]
   · simp only [bind_other _ h, subst, Term.rename_subst, Term.subst_rename]
-    rfl
+    congr 1
+    funext s n
+    by_cases hs : s = x.sort <;> simp [Sub.lift, Ren.shift, hs]
 
 end Names
 
-namespace Packed
 
-abbrev Expr (Γ : List LSort) := Σ s, Term Γ s
-
-def app : Expr Γ → Expr Γ → Option (Expr Γ)
-  | ⟨.arrow s t, f⟩, ⟨u, a⟩ =>
-      if h : u = s then some ⟨t, .app f (h ▸ a)⟩ else none
-  | _, _ => none
-
-def lam (s : LSort) : Expr (s :: Γ) → Expr Γ
-  | ⟨t, b⟩ => ⟨s >> t, .lam b⟩
-
-def rename (ρ : Ren Γ Δ) : Expr Γ → Expr Δ
-  | ⟨s, e⟩ => ⟨s, e.rename ρ⟩
-
-def subst (σ : Sub Γ Δ) : Expr Γ → Expr Δ
-  | ⟨s, e⟩ => ⟨s, e.subst σ⟩
-
-theorem rename_app (ρ : Ren Γ Δ) (f a : Expr Γ) :
-    (app f a).map (rename ρ) = app (rename ρ f) (rename ρ a) := by
-  rcases f with ⟨s, f⟩
-  rcases a with ⟨u, a⟩
-  cases s with
-  | arrow s t =>
-      by_cases h : u = s
-      · subst u; simp [app, rename, Term.rename]
-      · simp [app, rename, h]
-  | _ => rfl
-
-theorem subst_app (σ : Sub Γ Δ) (f a : Expr Γ) :
-    (app f a).map (subst σ) = app (subst σ f) (subst σ a) := by
-  rcases f with ⟨s, f⟩
-  rcases a with ⟨u, a⟩
-  cases s with
-  | arrow s t =>
-      by_cases h : u = s
-      · subst u; simp [app, subst, Term.subst]
-      · simp [app, subst, h]
-  | _ => rfl
-
-end Packed
 
 /-- Resolve binders and free names while rejecting precisely ill-sorted applications. -/
-def interpretNamed : (e : Expr) → Names Γ → Option (Packed.Expr Γ)
+
+def interpretNamed : (e : Expr) → Names → Option (Packed.Expr)
   | .var x, η => some ⟨x.sort, η x⟩
   | .const c, _ => some ⟨c.sort, .const c.id⟩
   | .app f a, η => do
@@ -98,9 +61,10 @@ def interpretNamed : (e : Expr) → Names Γ → Option (Packed.Expr Γ)
   | .lam x b, η => (interpretNamed b (η.bind x)).map (Packed.lam x.sort)
 
 /-- Ignore environment entries outside the expression's free variables. -/
-theorem interpretNamed_support (e : Expr) (η θ : Names Γ)
+
+theorem interpretNamed_support (e : Expr) (η θ : Names)
     (h : ∀ x ∈ e.freeVars, η x = θ x) : interpretNamed e η = interpretNamed e θ := by
-  induction e generalizing Γ with
+  induction e generalizing η θ with
   | var x => simp [interpretNamed, h x (by simp)]
   | const => rfl
   | app f a ihf iha =>
@@ -118,9 +82,10 @@ theorem interpretNamed_support (e : Expr) (η θ : Names Γ)
         rw [h y (by simp [hy, hyx])]
 
 /-- Commute named interpretation with capture-free bound renaming. -/
-theorem interpretNamed_rename (e : Expr) (η : Names Γ) (ρ : Ren Γ Δ) :
+
+theorem interpretNamed_rename (e : Expr) (η : Names) (ρ : Ren) :
     interpretNamed e (η.rename ρ) = (interpretNamed e η).map (Packed.rename ρ) := by
-  induction e generalizing Γ Δ with
+  induction e generalizing η ρ with
   | var => rfl
   | const => rfl
   | app f a ihf iha =>
@@ -133,9 +98,10 @@ theorem interpretNamed_rename (e : Expr) (η : Names Γ) (ρ : Ren Γ Δ) :
       rfl
 
 /-- Commute named interpretation with capture-free bound substitution. -/
-theorem interpretNamed_subst (e : Expr) (η : Names Γ) (σ : Sub Γ Δ) :
+
+theorem interpretNamed_subst (e : Expr) (η : Names) (σ : Sub) :
     interpretNamed e (η.subst σ) = (interpretNamed e η).map (Packed.subst σ) := by
-  induction e generalizing Γ Δ with
+  induction e generalizing η σ with
   | var => rfl
   | const => rfl
   | app f a ihf iha =>
@@ -148,9 +114,10 @@ theorem interpretNamed_subst (e : Expr) (η : Names Γ) (σ : Sub Γ Δ) :
       rfl
 
 /-- Infer the source sort independently of the chosen free-variable interpretations. -/
-theorem interpretNamed_sort (e : Expr) (η : Names Γ) :
+
+theorem interpretNamed_sort (e : Expr) (η : Names) :
     (interpretNamed e η).map Sigma.fst = e.sort := by
-  induction e generalizing Γ with
+  induction e generalizing η with
   | var => rfl
   | const => rfl
   | lam x b ih =>
@@ -179,8 +146,9 @@ theorem interpretNamed_sort (e : Expr) (η : Names Γ) :
               | _ => simp [interpretNamed, he, he', Packed.app, Expr.sort, ← hf]
 
 /-- Interpret every sorted source expression at its original sort. -/
-theorem interpretNamed_sorted {e : Expr} (h : e.hasSort s) (η : Names Γ) :
-    ∃ t : Term Γ s, interpretNamed e η = some ⟨s, t⟩ := by
+
+theorem interpretNamed_sorted {e : Expr} (h : e.hasSort s) (η : Names) :
+    ∃ t : Term s, interpretNamed e η = some ⟨s, t⟩ := by
   have hs := (interpretNamed_sort e η).trans h
   cases he : interpretNamed e η with
   | none => simp [he] at hs

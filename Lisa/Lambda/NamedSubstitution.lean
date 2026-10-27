@@ -1,15 +1,15 @@
 import Lisa.Lambda.NamedEnvironment
 
-namespace Lisa
-namespace Subst
+namespace Lisa.Lambda
+namespace NamedSubst
 
 theorem lookup_without (σ : Subst) (x y : SVar) :
     (σ.without x).find? y = if y = x then none else σ.find? y := by
   induction σ with
-  | nil => simp [without, Lean.AssocList.find?]
+  | nil => simp [Subst.without, Lean.AssocList.find?]
   | cons z e rest ih =>
       by_cases hzx : z = x <;> by_cases hzy : z = y <;> by_cases hyx : y = x <;>
-        simp_all [without, Lean.AssocList.find?, Bool.beq_eq_decide_eq]
+        simp_all [Subst.without, Lean.AssocList.find?, Bool.beq_eq_decide_eq]
 
 private theorem lookup_replace_other (σ : Subst) (x y : SVar) (e : Expr) (h : y ≠ x) :
     (σ.replace x e).find? y = σ.find? y := by
@@ -54,30 +54,31 @@ theorem lookup_freeVars {σ : Subst} {x : SVar} {e : Expr} (h : σ.find? x = som
       · simp [Lean.AssocList.find?, Bool.beq_eq_decide_eq, hyx] at h
         exact (ih h).trans Finset.subset_union_right
 
-end Subst
-
-namespace Lambda
+end NamedSubst
 
 /-- Specify how a named substitution acts on the relevant environment entries. -/
-def Represents (σ : Subst) (η θ : Names Γ) (xs : Finset SVar) : Prop :=
+
+def Represents (σ : Subst) (η θ : Names) (xs : Finset SVar) : Prop :=
   ∀ x ∈ xs, match σ.find? x with
     | none => η x = θ x
     | some e => interpretNamed e η = some ⟨x.sort, θ x⟩
 
 /-- Weaken an expression beneath a binder that does not occur freely in it. -/
-theorem interpretNamed_bind_fresh (e : Expr) (η : Names Γ) (x : SVar)
+
+theorem interpretNamed_bind_fresh (e : Expr) (η : Names) (x : SVar)
     (h : x ∉ e.freeVars) :
-    interpretNamed e (η.bind x) = (interpretNamed e η).map (Packed.rename Var.there) := by
+    interpretNamed e (η.bind x) = (interpretNamed e η).map (Packed.rename (Ren.shift x.sort)) := by
   rw [← interpretNamed_rename]
   apply interpretNamed_support
   intro y hy
   exact Names.bind_other η (fun hyx => h (hyx ▸ hy))
 
 /-- Preserve capture-avoiding named substitution exactly, including binder renaming. -/
-theorem interpretNamed_namedSubst (e : Expr) (σ : Subst) (η θ : Names Γ)
+
+theorem interpretNamed_namedSubst (e : Expr) (σ : Subst) (η θ : Names)
     (h : Represents σ η θ e.freeVars) :
     interpretNamed (σ.subst e) η = interpretNamed e θ := by
-  induction e generalizing Γ σ with
+  induction e generalizing σ η θ with
   | var x =>
       have hx := h x (by simp)
       cases he : σ.find? x <;> simpa [Subst.subst, interpretNamed, he] using hx
@@ -104,7 +105,7 @@ theorem interpretNamed_namedSubst (e : Expr) (σ : Subst) (η θ : Names Γ)
         congr 1
         apply ih
         intro y hy
-        simp only [Subst.lookup_insert, Subst.lookup_without]
+        simp only [NamedSubst.lookup_insert, NamedSubst.lookup_without]
         by_cases hyx : y = x
         · subst y
           simp [interpretNamed, Names.bind_self, x']
@@ -115,17 +116,18 @@ theorem interpretNamed_namedSubst (e : Expr) (σ : Subst) (η θ : Names Γ)
           | none =>
               simp only [he] at hrel ⊢
               simp only [Names.bind_other _ hyx, Names.bind_other _ hyx', hrel]
+              rfl
           | some v =>
               simp only [he] at hrel ⊢
               rw [interpretNamed_bind_fresh v η x'
-                (fun hv => hrange (Subst.lookup_freeVars he hv)), hrel]
-              simp [Packed.rename, Names.bind_other _ hyx]
+                (fun hv => hrange (NamedSubst.lookup_freeVars he hv)), hrel]
+              simp [Packed.rename, Names.bind_other _ hyx, x']
       · rename_i hx
         simp only [interpretNamed]
         congr 1
         apply ih
         intro y hy
-        simp only [Subst.lookup_without]
+        simp only [NamedSubst.lookup_without]
         by_cases hyx : y = x
         · subst y; simp
         · simp only [hyx, ↓reduceIte]
@@ -137,18 +139,19 @@ theorem interpretNamed_namedSubst (e : Expr) (σ : Subst) (η θ : Names Γ)
           | some v =>
               simp only [he] at hrel ⊢
               rw [interpretNamed_bind_fresh v η x
-                (fun hv => hx (Subst.lookup_freeVars he hv)), hrel]
+                (fun hv => hx (NamedSubst.lookup_freeVars he hv)), hrel]
               simp [Packed.rename, Names.bind_other _ hyx]
 
 /-- Interpret named beta substitution as instantiation of the innermost typed binder. -/
-theorem interpretNamed_substOne (x : SVar) (body arg : Expr) (η : Names Γ)
-    (a : Term Γ x.sort) (ha : interpretNamed arg η = some ⟨x.sort, a⟩) :
+
+theorem interpretNamed_substOne (x : SVar) (body arg : Expr) (η : Names)
+    (a : Term x.sort) (ha : interpretNamed arg η = some ⟨x.sort, a⟩) :
     interpretNamed (Expr.substOne x arg body) η =
       (interpretNamed body (η.bind x)).map (Packed.subst (Term.single a)) := by
   rw [← interpretNamed_subst]
   apply interpretNamed_namedSubst
   intro y _
-  simp only [Subst.lookup_insert, Lean.AssocList.find?]
+  simp only [NamedSubst.lookup_insert, Lean.AssocList.find?]
   by_cases h : y = x
   · subst y
     simpa [Names.subst, Term.subst, Term.single] using ha

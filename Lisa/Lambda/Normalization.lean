@@ -1,111 +1,132 @@
 import Lisa.Lambda.Evaluation
 
+/-! Readback correctness through a relation at increasing per-sort depths.
+Only syntax is weakened; the related semantic value stays unchanged. -/
 namespace Lisa.Lambda
+namespace Depth
 
-/-- Relate syntax to semantic values by testing functions on related arguments. -/
-def Related : (s : LSort) → Term Γ s → Val Γ s → Prop
-  | .ind, e, v => Equiv e v
-  | .prop, e, v => Equiv e v
-  | .arrow s t, e, v => ∀ {Δ} (ρ : Ren Γ Δ) (a : Term Δ s) (w : Val Δ s),
-      Related s a w → Related t (.app (e.rename ρ) a) (v.run ρ w)
+def Extends (d k : Depth) : Prop := ∀ s, d s ≤ k s
+
+@[refl] theorem extends_refl (d : Depth) : Extends d d := fun _ => Nat.le_refl _
+
+theorem Extends.trans (h : Extends d k) (h' : Extends k l) : Extends d l := fun s => Nat.le_trans (h s) (h' s)
+
+theorem extends_inc (d : Depth) (s : LSort) : Extends d (d.inc s) := by
+  intro t; by_cases h : t = s <;> simp [inc, h]
+
+theorem zero_extends (d : Depth) : Extends zero d := fun _ => Nat.zero_le _
+
+def weaken (d k : Depth) : Ren := fun s n => n + (k s - d s)
+
+@[simp] theorem weaken_self : weaken d d = Ren.id := by funext s n; simp [weaken, Ren.id]
+
+theorem weaken_comp (h : Extends d k) (h' : Extends k l) :
+    Ren.comp (weaken d k) (weaken k l) = weaken d l := by
+  funext s n
+  have := h s; have := h' s
+  simp only [Ren.comp, weaken]; omega
+
+@[simp] theorem weaken_inc : weaken d (d.inc b) = Ren.shift b := by
+  funext s n
+  by_cases h : s = b <;> simp [weaken, inc, Ren.shift, h]
+end Depth
+
+/-- A residual prints the same open expression at every later readback depth. -/
+
+def RepresentsAt (d : Depth) (e : Term s) (n : Residual s) : Prop :=
+  ∀ k, d.Extends k → Equiv (e.rename (d.weaken k)) (n k)
+
+def Related : (s : LSort) → Depth → Term s → Val s → Prop
+  | .ind, d, e, v => RepresentsAt d e v
+  | .prop, d, e, v => RepresentsAt d e v
+  | .arrow s t, d, e, v => ∀ k, d.Extends k → ∀ a w,
+      Related s k a w → Related t k (.app (e.rename (d.weaken k)) a) (v w)
 
 namespace Related
 
-theorem congr {e f : Term Γ s} {v : Val Γ s} (h : Related s e v)
-    (hef : Equiv e f) : Related s f v := by
-  induction s generalizing Γ with
-  | ind => exact hef.symm.trans h
-  | prop => exact hef.symm.trans h
-  | arrow s t _ iht =>
-      intro Δ ρ a w ha
-      exact iht (h ρ a w ha) (.app (hef.rename ρ) (.refl a))
+theorem congr (h : Related s d e v) (hef : Equiv e f) : Related s d f v := by
+  induction s generalizing d with
+  | ind => exact fun k hk => (hef.rename _).symm.trans (h k hk)
+  | prop => exact fun k hk => (hef.rename _).symm.trans (h k hk)
+  | arrow s t _ ih => exact fun k hk a w ha => ih (h k hk a w ha) (.app (hef.rename _) (.refl a))
 
-theorem rename {e : Term Γ s} {v : Val Γ s} (h : Related s e v) (ρ : Ren Γ Δ) :
-    Related s (e.rename ρ) ((model s).values.map ρ v) := by
-  induction s generalizing Γ Δ with
-  | ind => exact Equiv.rename h ρ
-  | prop => exact Equiv.rename h ρ
+theorem mono (h : Related s d e v) (hdk : d.Extends k) : Related s k (e.rename (d.weaken k)) v := by
+  cases s with
+  | ind => exact fun l hkl => by simpa [Depth.weaken_comp hdk hkl] using h l (hdk.trans hkl)
+  | prop => exact fun l hkl => by simpa [Depth.weaken_comp hdk hkl] using h l (hdk.trans hkl)
   | arrow s t =>
-      intro Θ τ a w ha
-      simpa only [Term.rename_comp] using h (Ren.comp ρ τ) a w ha
-
+      intro l hkl a w ha
+      simpa [Depth.weaken_comp hdk hkl] using h l (hdk.trans hkl) a w ha
 end Related
 
-/-- Prove readback and reflection together by induction on the sort. -/
+theorem fresh_represents (d : Depth) (s : LSort) :
+    RepresentsAt (d.inc s) (.bound (s := s) 0) (fresh s (d s)) := by
+  intro k hk
+  simp only [Term.rename, Depth.weaken, Nat.zero_add, Depth.inc_self, fresh]
+  exact .refl _
+/-- Sound readback and reflection, proved together by induction on the sort. -/
+
 theorem readback_correct (s : LSort) :
-    (∀ {Γ} (e : Term Γ s) (v : Val Γ s), Related s e v →
-      Equiv e ((model s).quote v)) ∧
-    (∀ {Γ} (e : Term Γ s), Related s e ((model s).reflect e)) := by
+    (∀ d e v, Related s d e v → Equiv e (quote s d v)) ∧
+    (∀ d e n, RepresentsAt d e n → Related s d e (reflect s n)) := by
   induction s with
-  | ind => exact ⟨fun _ _ h => h, fun _ => .refl _⟩
-  | prop => exact ⟨fun _ _ h => h, fun _ => .refl _⟩
+  | ind => exact ⟨fun d _ _ h => by simpa using h d (Depth.extends_refl d), fun _ _ _ h => h⟩
+  | prop => exact ⟨fun d _ _ h => by simpa using h d (Depth.extends_refl d), fun _ _ _ h => h⟩
   | arrow s t ihs iht =>
       constructor
-      · intro Γ e v h
-        have hb := iht.1 _ _ (h Var.there (.bound .here) _ (ihs.2 _))
-        exact (Equiv.eta e).symm.trans (.lam hb)
-      · intro Γ e Δ ρ a w ha
-        have h := iht.2 (.app (e.rename ρ) ((model s).quote w))
-        exact h.congr (.app (.refl _) (ihs.1 a w ha).symm)
+      · intro d e v h
+        have ha := ihs.2 (d.inc s) (.bound 0) _ (fresh_represents d s)
+        have hb := iht.1 _ _ _ (h (d.inc s) (Depth.extends_inc d s) _ _ ha)
+        exact (Equiv.eta e).symm.trans (.lam (by simpa using hb))
+      · intro d e n hn k hk a w ha
+        apply iht.2
+        intro l hl
+        have hnl := hn l (hk.trans hl)
+        have hal := ihs.1 _ _ _ (ha.mono hl)
+        simpa [Term.rename, Depth.weaken_comp hk hl] using Equiv.app hnl hal
 
-namespace Term
-
-theorem subst_lift_rename (b : Term (s :: Γ) t) (σ : Sub Γ Δ) (ρ : Ren Δ Θ) :
-    (b.subst (Sub.lift σ)).rename (Ren.lift ρ) =
-      b.subst (Sub.lift (fun v => (σ v).rename ρ)) := by
+theorem Term.subst_lift_rename (b : Term t) (σ : Sub) (ρ : Ren) :
+    (b.subst (σ.lift s)).rename (ρ.lift s) = b.subst (Sub.lift s (fun t n => (σ t n).rename ρ)) := by
   rw [rename_subst]
   congr 1
-  funext u v
-  cases v with
-  | here => rfl
-  | there v =>
-      simp only [Sub.lift, rename_comp]
-      rfl
+  funext u n
+  by_cases h : u = s
+  · subst u; cases n <;> simp [Sub.lift, Term.rename, Ren.lift, Ren.lift_shift]
+  · simp [Sub.lift, h, Ren.lift_shift]
 
-end Term
+/-- Evaluate under related syntactic and semantic assignments. -/
 
-/-- Relate simultaneous syntactic substitution to semantic evaluation. -/
-theorem fundamental (e : Term Γ s) (σ : Sub Γ Δ) (η : Env Γ Δ)
-    (h : ∀ {t} (v : Var Γ t), Related t (σ v) (η v)) :
-    Related s (e.subst σ) (eval e η) := by
-  induction e generalizing Δ with
-  | bound v => exact h v
-  | free x => exact (readback_correct _).2 (.free x)
-  | const c => exact (readback_correct _).2 (.const c)
-  | app f a ihf iha =>
-      simpa only [Term.rename_id] using ihf σ η h Ren.id _ _ (iha σ η h)
-  | lam b ih =>
-      intro Θ ρ a w ha
-      let σ' : Sub _ Θ := fun v => (σ v).rename ρ
-      have h' : ∀ {u} (v : Var _ u),
-          Related u (Sub.extend σ' a v) (Env.extend (Env.rename η ρ) w v) := by
-        intro u v
-        cases v with
-        | here => exact ha
-        | there v => exact (h v).rename ρ
-      have hb := ih (Sub.extend σ' a) (Env.extend (Env.rename η ρ) w) h'
-      have hβ := Equiv.beta ((b.subst (Sub.lift σ)).rename (Ren.lift ρ)) a
+theorem fundamental (e : Term s) (d : Depth) (σ : Sub) (η : Env)
+    (h : ∀ t n, Related t d (σ t n) (η t n)) : Related s d (e.subst σ) (eval e η) := by
+  induction e generalizing d σ η with
+  | bound n => exact h _ n
+  | free x => exact (readback_correct _).2 _ _ _ (fun _ _ => .refl _)
+  | const c => exact (readback_correct _).2 _ _ _ (fun _ _ => .refl _)
+  | app f a ihf iha => simpa using ihf d σ η h d (Depth.extends_refl d) _ _ (iha d σ η h)
+  | lam b e ih =>
+      intro k hk a w ha
+      let σ' : Sub := fun t n => (σ t n).rename (d.weaken k)
+      have h' : ∀ t n, Related t k (Sub.extend σ' a t n) (η.extend w t n) := by
+        intro t n
+        by_cases ht : t = b
+        · subst t; cases n with
+          | zero => simpa using ha
+          | succ n => simpa [σ'] using (h b n).mono hk
+        · simpa [Sub.extend, Env.extend, ht, σ'] using (h t n).mono hk
+      have hb := ih k (Sub.extend σ' a) (η.extend w) h'
+      have hβ := Equiv.beta ((e.subst (σ.lift b)).rename ((d.weaken k).lift b)) a
       rw [Term.subst_lift_rename, Term.instantiate_subst] at hβ
-      simp only [Term.subst, Term.rename, Term.subst_lift_rename]
-      exact hb.congr hβ.symm
+      simpa only [Term.subst, Term.rename, Term.subst_lift_rename] using hb.congr hβ.symm
 
-/-- Return a beta-eta equivalent term by a total, structurally recursive procedure. -/
-theorem normalize_sound (e : Term Γ s) : Equiv e (normalize e) := by
-  have h := fundamental e Sub.id (fun v => (model _).reflect (.bound v))
-    (fun v => (readback_correct _).2 (.bound v))
-  rw [Term.subst_id] at h
-  exact (readback_correct s).1 _ _ h
+theorem normalize_sound (e : Term s) : Equiv e (normalize e) := by
+  have h := fundamental e Depth.zero Sub.id ambient (fun t n =>
+    (readback_correct t).2 _ _ _ (fun k _ => by
+      simp [Sub.id, Term.rename, Depth.weaken, Depth.zero, Nat.add_comm]; exact .refl _))
+  simpa using (readback_correct s).1 _ _ _ h
 
-/-- Characterize beta-eta equivalence by syntactic equality of total readbacks. -/
-theorem equiv_iff_normalize_eq (e f : Term Γ s) :
-    Equiv e f ↔ normalize e = normalize f := by
-  constructor
-  · exact normalize_eq_of_equiv
-  · intro h
-    exact (normalize_sound e).trans (h ▸ (normalize_sound f).symm)
+theorem equiv_iff_normalize_eq (e f : Term s) : Equiv e f ↔ normalize e = normalize f :=
+  ⟨normalize_eq_of_equiv, fun h => (normalize_sound e).trans (h ▸ (normalize_sound f).symm)⟩
 
-@[simp] theorem normalize_idempotent (e : Term Γ s) :
-    normalize (normalize e) = normalize e :=
+@[simp] theorem normalize_idempotent (e : Term s) : normalize (normalize e) = normalize e :=
   (normalize_eq_of_equiv (normalize_sound e)).symm
-
 end Lisa.Lambda
