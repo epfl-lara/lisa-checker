@@ -1,4 +1,5 @@
 import Lisa.Checker.Check
+import Lisa.LambdaFol.Statements
 
 namespace Imported.Checker
 open Lisa
@@ -21,5 +22,18 @@ theorem ClosedChecked.sound {statement : Statement}
     Nonempty (Ordered.AlphaBetaEtaProof statement.sequent.1 statement.sequent.2) := by
   obtain ⟨p⟩ := result.resolveWith (fun h => h)
   exact ⟨Ordered.translate ProofRelation.admissible (weakenedToOrdered p)⟩
+
+open LambdaFol in
+/-- A closed checked certificate with a first-order conclusion yields a proof of
+its canonical translation in PureFol, the first-order calculus with epsilon.
+Intermediate formulas need not satisfy the first-order restrictions. -/
+theorem ClosedChecked.sound_pureFol {statement : Statement}
+    (result : ClosedChecked ProofRelation statement)
+    (hΓ : isFSet statement.sequent.1) (hΔ : isFSet statement.sequent.2)
+    (hbΓ : ∀ p ∈ statement.sequent.1, FirstOrderCompatible p)
+    (hbΔ : ∀ p ∈ statement.sequent.2, FirstOrderCompatible p) :
+    PureFol.Provable (PureFolTranslation.canonicalFormulaSet statement.sequent.1)
+      (PureFolTranslation.canonicalFormulaSet statement.sequent.2) :=
+  (ordered_iff_pureFol hΓ hΔ hbΓ hbΔ).mp result.sound
 
 end Imported.Checker

@@ -1,8 +1,8 @@
-import Lisa.Lambda.NamedDecision
+import Lisa.AlphaBetaEtaNormalization.NamedDecision
 
 namespace Lisa.Tests.NamedDecision
 
-open Lisa.Lambda
+open Lisa.AlphaBetaEtaNormalization
 
 private def x : SVar := ⟨⟨"x", 0⟩, prop⟩
 private def y : SVar := ⟨⟨"y", 0⟩, prop⟩

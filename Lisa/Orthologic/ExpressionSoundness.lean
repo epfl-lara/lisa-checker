@@ -1,5 +1,5 @@
 import Lisa.Orthologic.Expression
-import Lisa.Orthologic.LoweringSoundness
+import Lisa.Orthologic.FromLambdaSoundness
 import Lisa.Orthologic.NormalizationSoundness
 
 /-! Public guarantees for the named LambdaFOL pipeline. Accepted comparisons
@@ -10,8 +10,8 @@ namespace Lisa.Orthologic
 open Derivation
 
 theorem prepare_sort (p : Expr) : (prepare p).map Sigma.fst = p.sort := by
-  rw [← Lambda.interpretNamed_sort p Lambda.Names.free]
-  cases h : Lambda.interpretNamed p Lambda.Names.free with
+  rw [← AlphaBetaEtaNormalization.interpretNamed_sort p AlphaBetaEtaNormalization.Names.free]
+  cases h : AlphaBetaEtaNormalization.interpretNamed p AlphaBetaEtaNormalization.Names.free with
   | none => simp [prepare, h]
   | some e => cases e; simp [prepare, h]
 
@@ -19,7 +19,7 @@ theorem prepare_hasSort (h : prepare p = some ⟨s, e⟩) : p.hasSort s := by
   simpa [h] using (prepare_sort p).symm
 
 theorem prepare_none (p : Expr) : prepare p = none ↔ p.sort = none := by
-  rw [prepare, Option.map_eq_none_iff, Lambda.interpretNamed_none]
+  rw [prepare, Option.map_eq_none_iff, AlphaBetaEtaNormalization.interpretNamed_none]
 
 theorem normalize_none (p : Expr) : normalize p = none ↔ p.sort = none := by
   rw [normalize, Option.map_eq_none_iff, prepare_none]
@@ -36,17 +36,17 @@ theorem normalize_sort (h : normalize p = some q) : p.sort = q.sort := by
 /-- Alpha-renaming has no effect on the internal normalized expression. -/
 theorem prepare_alpha (h : AlphaEq p q) : prepare p = prepare q := by
   unfold prepare
-  rw [Lambda.interpretNamed_alpha h]
+  rw [AlphaBetaEtaNormalization.interpretNamed_alpha h]
 
 /-- The OL stage receives the same input for alpha-beta-eta equivalent terms. -/
 theorem prepare_alphaBetaEta (hp : p.hasSort s) (h : AlphaBetaEta p q) :
     prepare p = prepare q := by
-  obtain ⟨e, he⟩ := Lambda.interpretNamed_sorted hp Lambda.Names.free
-  obtain ⟨f, hf⟩ := Lambda.interpretNamed_sorted (h.preserves_sort.symm.trans hp) Lambda.Names.free
-  have ht := Lambda.interpretNamed_alphaBetaEta h Lambda.Names.free
+  obtain ⟨e, he⟩ := AlphaBetaEtaNormalization.interpretNamed_sorted hp AlphaBetaEtaNormalization.Names.free
+  obtain ⟨f, hf⟩ := AlphaBetaEtaNormalization.interpretNamed_sorted (h.preserves_sort.symm.trans hp) AlphaBetaEtaNormalization.Names.free
+  have ht := AlphaBetaEtaNormalization.interpretNamed_alphaBetaEta h AlphaBetaEtaNormalization.Names.free
   rw [he, hf] at ht
   cases ht with
-  | some ht => simp [prepare, he, hf, Lambda.normalize_eq_of_equiv ht]
+  | some ht => simp [prepare, he, hf, AlphaBetaEtaNormalization.normalize_eq_of_equiv ht]
 
 theorem normalize_alphaBetaEta (hp : p.hasSort s) (h : AlphaBetaEta p q) :
     normalize p = normalize q := by
@@ -55,22 +55,22 @@ theorem normalize_alphaBetaEta (hp : p.hasSort s) (h : AlphaBetaEta p q) :
 
 /-- The complete pipeline preserves contextual equivalence at the input sort. -/
 theorem prepare_sound (h : prepare p = some ⟨s, e⟩) :
-    ContextEq s p (e.reify Lambda.Context.empty) := by
-  cases he : Lambda.interpretNamed p Lambda.Names.free with
+    ContextEq s p (e.reify AlphaBetaEtaNormalization.Context.empty) := by
+  cases he : AlphaBetaEtaNormalization.interpretNamed p AlphaBetaEtaNormalization.Names.free with
   | none => simp [prepare, he] at h
   | some t =>
       obtain ⟨t, b⟩ := t
       simp only [prepare, he, Option.map_some, Option.some.injEq] at h
       cases h
-      have hp := Lambda.hasSort_of_interpretNamed he
-      have hc := (AlphaBetaEta.alpha (Lambda.alpha_reify_of_interpretNamed he Lambda.Context.empty)).trans
-        ((Lambda.normalize_sound b).reify Lambda.Context.empty)
-      have hb := Lambda.Term.reify_sort (Lambda.normalize b) Lambda.Context.empty
-      have hl := SimpleExpr.reify_sort (SimpleExpr.ofTerm (Lambda.normalize b)) Lambda.Context.empty
-      have hn := SimpleExpr.reify_sort (computeNormalForm (SimpleExpr.ofTerm (Lambda.normalize b))) Lambda.Context.empty
+      have hp := AlphaBetaEtaNormalization.hasSort_of_interpretNamed he
+      have hc := (AlphaBetaEta.alpha (AlphaBetaEtaNormalization.alpha_reify_of_interpretNamed he AlphaBetaEtaNormalization.Context.empty)).trans
+        ((AlphaBetaEtaNormalization.normalize_sound b).reify AlphaBetaEtaNormalization.Context.empty)
+      have hb := AlphaBetaEtaNormalization.Term.reify_sort (AlphaBetaEtaNormalization.normalize b) AlphaBetaEtaNormalization.Context.empty
+      have hl := SimpleExpr.reify_sort (SimpleExpr.ofTerm (AlphaBetaEtaNormalization.normalize b)) AlphaBetaEtaNormalization.Context.empty
+      have hn := SimpleExpr.reify_sort (computeNormalForm (SimpleExpr.ofTerm (AlphaBetaEtaNormalization.normalize b))) AlphaBetaEtaNormalization.Context.empty
       exact ContextEq.trans hp hb hn (ContextEq.of_conversion hp hc)
         (ContextEq.trans hb hl hn (SimpleExpr.ofTerm_sound _ _).symm
-          ((computeNormalForm_sound _).symm Lambda.Context.empty))
+          ((computeNormalForm_sound _).symm AlphaBetaEtaNormalization.Context.empty))
 
 theorem normalize_sound (hp : p.hasSort s) (h : normalize p = some q) :
     ContextEq s p q := by
@@ -144,7 +144,7 @@ theorem isSame_sound (h : isSame p q = some true) :
   have ht := prepare_hasSort hq
   exact ⟨s, hs, ht, ContextEq.trans hs (e.reify_sort _) ht (prepare_sound hp)
     (ContextEq.trans (e.reify_sort _) (f.reify_sort _) ht
-      (latticesEQ_sound e f h Lambda.Context.empty) (prepare_sound hq).symm)⟩
+      (latticesEQ_sound e f h AlphaBetaEtaNormalization.Context.empty) (prepare_sound hq).symm)⟩
 
 theorem isSame_formula_sound (hp : isFormula p) (h : isSame p q = some true) :
     Nonempty (Ordered.AlphaBetaEtaProof {p} {q}) ∧
@@ -192,7 +192,7 @@ theorem isImplying_sound (h : isImplying p q = some true) :
   have hs := prepare_hasSort hp
   have ht := prepare_hasSort hq
   obtain ⟨d⟩ := (ContextEq.formula hs (e.reify_sort _) (prepare_sound hp)).1
-  obtain ⟨c⟩ := latticesLEQ_sound h Lambda.Context.empty
+  obtain ⟨c⟩ := latticesLEQ_sound h AlphaBetaEtaNormalization.Context.empty
   obtain ⟨b⟩ := (ContextEq.formula ht (f.reify_sort _) (prepare_sound hq)).2
   exact ⟨Derivation.trans hs (e.reify_sort _) ht d
     (Derivation.trans (e.reify_sort _) (f.reify_sort _) ht c b)⟩

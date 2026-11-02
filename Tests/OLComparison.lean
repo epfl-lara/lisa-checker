@@ -67,17 +67,17 @@ private def observe (t : SimpleExpr ind) : SimpleExpr prop :=
 
 -- A binder of a different sort does not consume a propositional index.
 #guard AlphaEq
-    ((SimpleExpr.lam prop (.lam ind (.bound (s := prop) 0))).reify Lambda.Context.empty)
+    ((SimpleExpr.lam prop (.lam ind (.bound (s := prop) 0))).reify AlphaBetaEtaNormalization.Context.empty)
     (.lam ⟨⟨"a", 0⟩, prop⟩ (.lam ⟨⟨"b", 0⟩, ind⟩ (.var ⟨⟨"a", 0⟩, prop⟩)))
 
 -- These are actual Ordered derivations, not merely successful Boolean checks.
-noncomputable def quantifiedProjection (p q : SimpleExpr prop) (ρ : Lambda.Context) :
+noncomputable def quantifiedProjection (p q : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
     Derivation.Entails ((SimpleExpr.all (.conj [p, q])).reify ρ) (p.all.reify ρ) :=
   SimpleExpr.all_mono (.conj [p, q]) p (fun ρ => by
     simpa only [SimpleExpr.reify_conj_pair] using
       Derivation.and_left (p.reify_sort ρ) (q.reify_sort ρ)) ρ
 
-noncomputable def negativeQuantifiedProjection (p q : SimpleExpr prop) (ρ : Lambda.Context) :
+noncomputable def negativeQuantifiedProjection (p q : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
     Derivation.Entails (p.all.neg.reify ρ) ((SimpleExpr.neg (.all (.conj [p, q]))).reify ρ) :=
   SimpleExpr.neg_all_mono p (.conj [p, q]) (fun ρ => by
     simpa only [SimpleExpr.reify_conj_pair] using

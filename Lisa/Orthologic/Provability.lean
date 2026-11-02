@@ -13,10 +13,10 @@ open Expr Derivation
 
 namespace SimpleExpr
 
-theorem reify_all_at (p : SimpleExpr prop) (ρ : Lambda.Context) (x : SVar)
+theorem reify_all_at (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) (x : SVar)
     (hs : x.sort = ind) (hx : x ∉ p.toTerm.freeVars) (hu : x.id ∉ ρ.used x.sort) :
     AlphaBetaEta ((all p).reify ρ) (forall_ x (p.reify (ρ.extend x))) := by
-  have h := Lambda.reify_lam_at p.toTerm ρ x hx hu
+  have h := AlphaBetaEtaNormalization.reify_lam_at p.toTerm ρ x hx hu
   rw [hs] at h
   unfold reify
   rw [toTerm]
@@ -24,7 +24,7 @@ theorem reify_all_at (p : SimpleExpr prop) (ρ : Lambda.Context) (x : SVar)
 
 /-- Soundness of the positive quantifier case, including binder reconstruction. -/
 noncomputable def all_mono (p q : SimpleExpr prop)
-    (body : ∀ ρ, Entails (p.reify ρ) (q.reify ρ)) (ρ : Lambda.Context) :
+    (body : ∀ ρ, Entails (p.reify ρ) (q.reify ρ)) (ρ : AlphaBetaEtaNormalization.Context) :
     Entails ((all p).reify ρ) ((all q).reify ρ) := by
   let x := ρ.fresh (p.toTerm.freeVars ∪ q.toTerm.freeVars) ind
   have hx := ρ.fresh_not_mem (p.toTerm.freeVars ∪ q.toTerm.freeVars) ind
@@ -37,7 +37,7 @@ noncomputable def all_mono (p q : SimpleExpr prop)
 
 /-- Negative quantifiers reverse the direction of the body comparison. -/
 noncomputable def neg_all_mono (p q : SimpleExpr prop)
-    (body : ∀ ρ, Entails (q.reify ρ) (p.reify ρ)) (ρ : Lambda.Context) :
+    (body : ∀ ρ, Entails (q.reify ρ) (p.reify ρ)) (ρ : AlphaBetaEtaNormalization.Context) :
     Entails ((neg (all p)).reify ρ) ((neg (all q)).reify ρ) := by
   simpa only [reify_neg] using
     Derivation.neg_mono ((all q).reify_sort _) ((all p).reify_sort _) (q.all_mono p body ρ)
@@ -153,17 +153,14 @@ theorem lam (s : LSort) {p q : SimpleExpr t} (h : ProvableEQ p q) :
   have hu := ρ.fresh_not_used (p.toTerm.freeVars ∪ q.toTerm.freeVars) s
   have hp : AlphaBetaEta ((SimpleExpr.lam s p).reify ρ) (.lam x (p.reify (ρ.extend x))) := by
     unfold reify; rw [toTerm]
-    exact .alpha (Lambda.reify_lam_at p.toTerm ρ x (fun hm => hx (Finset.mem_union_left _ hm)) hu)
+    exact .alpha (AlphaBetaEtaNormalization.reify_lam_at p.toTerm ρ x (fun hm => hx (Finset.mem_union_left _ hm)) hu)
   have hq : AlphaBetaEta ((SimpleExpr.lam s q).reify ρ) (.lam x (q.reify (ρ.extend x))) := by
     unfold reify; rw [toTerm]
-    exact .alpha (Lambda.reify_lam_at q.toTerm ρ x (fun hm => hx (Finset.mem_union_right _ hm)) hu)
+    exact .alpha (AlphaBetaEtaNormalization.reify_lam_at q.toTerm ρ x (fun hm => hx (Finset.mem_union_right _ hm)) hu)
   have hp' := hp.preserves_sort.symm.trans ((SimpleExpr.lam s p).reify_sort ρ)
   have hq' := hq.preserves_sort.symm.trans ((SimpleExpr.lam s q).reify_sort ρ)
-  exact ContextEq.trans ((SimpleExpr.lam s p).reify_sort _) hp' ((SimpleExpr.lam s q).reify_sort _)
-    (ContextEq.of_conversion ((SimpleExpr.lam s p).reify_sort _) hp)
-    (ContextEq.trans hp' hq' ((SimpleExpr.lam s q).reify_sort _)
-      (ContextEq.lam x (p.reify_sort _) (q.reify_sort _) (h (ρ.extend x)))
-      (ContextEq.of_conversion hq' hq.symm))
+  exact ContextEq.convert hp' hq' hp.symm hq.symm
+    (ContextEq.lam x (p.reify_sort _) (q.reify_sort _) (h (ρ.extend x)))
 
 theorem neg {p q : SimpleExpr prop} (h : ProvableEQ p q) : ProvableEQ (.neg p) (.neg q) :=
   of_le h.symm.le.neg h.le.neg
@@ -174,10 +171,9 @@ theorem all {p q : SimpleExpr prop} (h : ProvableEQ p q) : ProvableEQ (.all p) (
 theorem equal {a b c d : SimpleExpr ind} (h : ProvableEQ a c) (j : ProvableEQ b d) :
     ProvableEQ (.equal a b) (.equal c d) := by
   intro ρ; simp only [reify_equal]
-  exact ContextEq.app (ContextEq.app_sort rfl (a.reify_sort _))
-    (ContextEq.app_sort rfl (c.reify_sort _)) (b.reify_sort _) (d.reify_sort _)
-    (ContextEq.app_right (show (Expr.const (SConst.named "eq" (ind >> ind >> prop))).hasSort (ind >> ind >> prop) from rfl)
-      (a.reify_sort _) (c.reify_sort _) (h ρ)) (j ρ)
+  exact ContextEq.app₂ (show (Expr.const (SConst.named "eq" (ind >> ind >> prop))).hasSort
+    (ind >> ind >> prop) from rfl)
+    (a.reify_sort _) (c.reify_sort _) (b.reify_sort _) (d.reify_sort _) (h ρ) (j ρ)
 
 theorem equal_symm (a b : SimpleExpr ind) : ProvableEQ (.equal a b) (.equal b a) := by
   apply of_le <;> intro ρ <;> simp only [reify_equal]

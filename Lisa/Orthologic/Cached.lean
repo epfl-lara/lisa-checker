@@ -1,4 +1,6 @@
 import Lisa.Orthologic.CacheKey
+import Lisa.Orthologic.Expression
+import Std.Data.DHashMap.Basic
 
 /-! Verified memoization for the LambdaFOL OL pipeline. Cached values include
 exact agreement certificates, erased by compilation. A session is explicitly
@@ -7,10 +9,13 @@ owned by its caller; there is no global cache or hidden lifetime. -/
 namespace Lisa.Orthologic.Cached
 open SimpleExpr
 
+/-- A computed value with a proof that it equals the uncached specification. -/
 abbrev Answer (a : α) := {b : α // b = a}
 
 instance : Hashable SomeExpr := ⟨fun p => mixHash (hash p.1) (hash p.2)⟩
 
+/-- Enable storage and reuse independently for each category. `keys` controls
+both translation to lambda terms and the raw terms used to orient equality. -/
 structure Config where
   preparation : Bool := true
   normalization : Bool := true
@@ -18,6 +23,8 @@ structure Config where
   keys : Bool := true
   deriving Repr
 
+/-- Hits count reused entries. Misses count computations without a cached answer,
+including calls for which the corresponding cache category is disabled. -/
 structure Stats where
   preparationHits : Nat := 0
   preparationMisses : Nat := 0
@@ -39,6 +46,8 @@ def ComparisonKey.result : ComparisonKey → Bool
   | .eq _ p q => latticesEQ p q
   | .le p s q t => polarLEQ p s q t
 
+/-- Each table stores results certified for its exact key. Consequently, any
+inhabitant is a valid cache, even if it was not built by these operations. -/
 structure Cache where
   config : Config := {}
   stats : Stats := {}
@@ -49,6 +58,8 @@ structure Cache where
   orderKeys : Std.DHashMap (SimpleExpr ind) (fun p => Answer p.toTerm.erase) := ∅
 
 instance : EmptyCollection Cache := ⟨{}⟩
+
+/-! Short-circuiting and list traversals, carrying agreement proofs. -/
 
 private def andAnswer {a b : Bool} (x : Answer a) (next : StateM Cache (Answer b)) :
     StateM Cache (Answer (a && b)) := do
@@ -101,8 +112,8 @@ private def foldAnswers (f : β → α → β) (step : ∀ b a, StateM Cache (An
     let tail ← foldAnswers f step head.val as
     return ⟨tail.val, tail.property.trans (congrArg (fun b => as.foldl f b) head.property)⟩
 
-/-- Reuse the Lambda erasure needed by the original identity shortcuts. -/
-def termMemo (p : SimpleExpr s) : StateM Cache (Answer p.toTerm) := do
+/-- Cache the AlphaBetaEtaNormalization term used by the comparison's identity shortcut. -/
+def toTermMemo (p : SimpleExpr s) : StateM Cache (Answer p.toTerm) := do
   if (← get).config.keys then
     if let some result := (← get).terms.get? ⟨s, p⟩ then
       modify fun c => {c with stats.keyHits := c.stats.keyHits + 1}
@@ -125,6 +136,9 @@ private def memoCompare (key : ComparisonKey) (compute : StateM Cache (Answer ke
     modify fun c => {c with comparisons := c.comparisons.insert key result}
   return result
 
+/-! Recursive comparison. The auxiliary size index keeps the termination
+argument separate from the expression cases; it is not a search budget. -/
+
 local macro "memo_decrease" hn:ident : tactic => `(tactic|
   (try simp only [SimpleExpr.size] at $hn ⊢
    omega))
@@ -138,18 +152,18 @@ mutual
 
 /-- Memoized polarized implication. Each branch mirrors `polarLEQ`; the size
 measure belongs only to the termination proof, not to an executable argument. -/
-private def polarLEQAt (n : Nat) (p : SimpleExpr prop) (positive : Bool)
+private def polarLEQRec (n : Nat) (p : SimpleExpr prop) (positive : Bool)
     (q : SimpleExpr prop) (positive' : Bool) (hn : 2 * (p.size + q.size) = n) :
     StateM Cache (Answer (polarLEQ p positive q positive')) := by
   have implies (p s q t) (lt : 2 * (p.size + q.size) < n) :=
-    polarLEQAt (2 * (p.size + q.size)) p s q t rfl
+    polarLEQRec (2 * (p.size + q.size)) p s q t rfl
   have equivalent {s} (p q : SimpleExpr s) (lt : 2 * (p.size + q.size) + 1 < n) :=
-    latticesEQAt (2 * (p.size + q.size) + 1) p q rfl
+    latticesEQRec (2 * (p.size + q.size) + 1) p q rfl
   apply memoCompare (.le p positive q positive')
   change StateM Cache (Answer (polarLEQ p positive q positive'))
   refine do
-    let left ← termMemo p
-    let right ← termMemo q
+    let left ← toTermMemo p
+    let right ← toTermMemo q
     ?_
   unfold polarLEQ
   rw [← left.property, ← right.property]
@@ -200,17 +214,17 @@ termination_by n
 
 /-- Memoized equivalence: two directions at proposition sort, constructor
 congruence at the other sorts. -/
-private def latticesEQAt (n : Nat) (p q : SimpleExpr s)
+private def latticesEQRec (n : Nat) (p q : SimpleExpr s)
     (hn : 2 * (p.size + q.size) + 1 = n) : StateM Cache (Answer (latticesEQ p q)) := by
   have implies (p s q t) (lt : 2 * (p.size + q.size) < n) :=
-    polarLEQAt (2 * (p.size + q.size)) p s q t rfl
+    polarLEQRec (2 * (p.size + q.size)) p s q t rfl
   have equivalent {s} (p q : SimpleExpr s) (lt : 2 * (p.size + q.size) + 1 < n) :=
-    latticesEQAt (2 * (p.size + q.size) + 1) p q rfl
+    latticesEQRec (2 * (p.size + q.size) + 1) p q rfl
   apply memoCompare (.eq s p q)
   change StateM Cache (Answer (latticesEQ p q))
   refine do
-    let left ← termMemo p
-    let right ← termMemo q
+    let left ← toTermMemo p
+    let right ← toTermMemo q
     ?_
   unfold latticesEQ
   rw [← left.property, ← right.property]
@@ -236,21 +250,22 @@ end
 /-- Recursive memoized polarized implication, including negative answers. -/
 def polarLEQMemo (p : SimpleExpr prop) (s : Bool) (q : SimpleExpr prop) (t : Bool) :
     StateM Cache (Answer (polarLEQ p s q t)) :=
-  polarLEQAt _ p s q t rfl
+  polarLEQRec _ p s q t rfl
 
 /-- Recursive memoized equivalence at any sort. -/
 def latticesEQMemo (p q : SimpleExpr s) : StateM Cache (Answer (latticesEQ p q)) :=
-  latticesEQAt _ p q rfl
+  latticesEQRec _ p q rfl
 
 def latticesLEQMemo (p q : SimpleExpr prop) : StateM Cache (Answer (latticesLEQ p q)) :=
   polarLEQMemo p true q true
 
+/-! Normalization, sharing the comparison cache during refinement and pruning. -/
 
-private def refineFactorAt (n : Nat) (context : SimpleExpr prop) (positive : Bool)
+private def refineFactorRec (n : Nat) (context : SimpleExpr prop) (positive : Bool)
     (p : SimpleExpr prop) (sign : Bool) (hn : p.size = n) :
     StateM Cache (Answer (refineFactor context positive p sign)) := by
   have child (p : SimpleExpr prop) (sign : Bool) (lt : p.size < n) :=
-    refineFactorAt p.size context positive p sign rfl
+    refineFactorRec p.size context positive p sign rfl
   unfold refineFactor
   split
   · exact child _ _ (by memo_decrease hn)
@@ -275,41 +290,39 @@ termination_by n
 
 private def refineFactorMemo (context : SimpleExpr prop) (positive : Bool)
     (p : SimpleExpr prop) (sign : Bool) : StateM Cache (Answer (refineFactor context positive p sign)) :=
-  refineFactorAt p.size context positive p sign rfl
+  refineFactorRec p.size context positive p sign rfl
 
 private def pruneFactorsMemo (accepted : List (SimpleExpr prop)) :
     (ps : List (SimpleExpr prop)) → StateM Cache (Answer (pruneFactors accepted ps))
   | [] => pure ⟨accepted, rfl⟩
   | p :: ps => do
     let answer ← latticesLEQMemo (.conj (ps ++ accepted)) p
-    if h : answer.val = true then
-      let rest ← pruneFactorsMemo accepted ps
-      return ⟨rest.val, by simp [pruneFactors, ← answer.property, h, rest.property]⟩
-    else
-      let rest ← pruneFactorsMemo (p :: accepted) ps
-      return ⟨rest.val, by simp [pruneFactors, ← answer.property, h, rest.property]⟩
+    let rest ← pruneFactorsMemo (if answer.val then accepted else p :: accepted) ps
+    return ⟨rest.val, by
+      simp only [rest.property, answer.property, pruneFactors]
+      split <;> rfl⟩
 
-def reduceListMemo (ps : List (SimpleExpr prop)) (positive : Bool) :
-    StateM Cache (Answer (reduceList ps positive)) := do
+def simplifyFactorsMemo (ps : List (SimpleExpr prop)) (positive : Bool) :
+    StateM Cache (Answer (simplifyFactors ps positive)) := do
   let flattened ← foldAnswers (fun acc p => refineFactor (.conj ps) positive p true ++ acc)
     (fun acc p => do
       let result ← refineFactorMemo (.conj ps) positive p true
       return ⟨result.val ++ acc, by rw [result.property]⟩) [] ps
   let result ← pruneFactorsMemo [] flattened.val
-  return ⟨result.val, by simp only [result.property, flattened.property, reduceList]⟩
+  return ⟨result.val, by simp only [result.property, flattened.property, simplifyFactors]⟩
 
 private def contradictionMemo (ps : List (SimpleExpr prop)) (positive : Bool) :
     StateM Cache (Answer (checkForContradiction ps positive)) := by
   unfold checkForContradiction
   split <;> exact anyAnswers _ (fun _ => polarLEQMemo _ _ _ _) ps
 
-def reduceMemo (ps : List (SimpleExpr prop)) (positive : Bool) :
-    StateM Cache (Answer (reduce ps positive)) := do
-  let factors ← reduceListMemo ps positive
+def normalizeConjunctionMemo (ps : List (SimpleExpr prop)) (positive : Bool) :
+    StateM Cache (Answer (normalizeConjunction ps positive)) := do
+  let factors ← simplifyFactorsMemo ps positive
   let contradiction ← contradictionMemo factors.val positive
   return ⟨if contradiction.val then (if positive then .neg .top else .top)
       else assemble factors.val positive, by
-    simp only [reduce, ← factors.property, ← contradiction.property]⟩
+    simp only [normalizeConjunction, ← factors.property, ← contradiction.property]⟩
 
 /-- Cache the explicit-sort syntax used to orient symmetric equalities. -/
 def orderKeyMemo (p : SimpleExpr ind) : StateM Cache (Answer p.toTerm.erase) := do
@@ -318,7 +331,7 @@ def orderKeyMemo (p : SimpleExpr ind) : StateM Cache (Answer p.toTerm.erase) := 
       modify fun c => {c with stats.keyHits := c.stats.keyHits + 1}
       return result
   modify fun c => {c with stats.keyMisses := c.stats.keyMisses + 1}
-  let term ← termMemo p
+  let term ← toTermMemo p
   let result := ⟨term.val.erase, by rw [term.property]⟩
   if (← get).config.keys then
     modify fun c => {c with orderKeys := c.orderKeys.insert p result}
@@ -335,9 +348,9 @@ private def normalizeEqualityMemo (a b : SimpleExpr ind) :
     return ⟨if (StructuralOrder.compareTerms left.val right.val).isLE then .equal a b else .equal b a, by
       simp [normalizeEquality, ← same.property, h, orientEquality, left.property, right.property]⟩
 
-private def normalFormAt (n : Nat) {s} (p : SimpleExpr s) (hn : p.size = n) :
+private def computeNormalFormRec (n : Nat) {s} (p : SimpleExpr s) (hn : p.size = n) :
     StateM Cache (Answer (computeNormalForm p)) := by
-  have child {s} (p : SimpleExpr s) (lt : p.size < n) := normalFormAt p.size p rfl
+  have child {s} (p : SimpleExpr s) (lt : p.size < n) := computeNormalFormRec p.size p rfl
   refine do
     if (← get).config.normalization then
       if let some result := (← get).normalForms.get? ⟨s, p⟩ then
@@ -367,18 +380,18 @@ private def normalFormAt (n : Nat) {s} (p : SimpleExpr s) (hn : p.size = n) :
     exact do
       let ps ← mapAnswers _
         (fun p : {p // p ∈ ps} => child p.val (by member_decrease hn p)) ps.attach
-      let result ← reduceMemo ps.val true
+      let result ← normalizeConjunctionMemo ps.val true
       return ⟨result.val, by rw [result.property, ps.property]⟩
   · rename_i ps
     exact do
       let ps ← mapAnswers _
         (fun p : {p // p ∈ ps} => child p.val (by member_decrease hn p)) ps.attach
-      let result ← reduceMemo ps.val false
+      let result ← normalizeConjunctionMemo ps.val false
       return ⟨result.val, by rw [result.property, ps.property]⟩
   · rename_i b _
     exact do
       let b ← child b (by memo_decrease hn)
-      return ⟨inverse b.val, by rw [b.property]⟩
+      return ⟨negate b.val, by rw [b.property]⟩
   · rename_i b
     exact do
       let b ← child b (by memo_decrease hn)
@@ -395,7 +408,9 @@ termination_by n
 comparison cache as public queries. The size parameter above only justifies
 termination; it is never fuel and cannot exhaust. -/
 def computeNormalFormMemo (p : SimpleExpr s) : StateM Cache (Answer (computeNormalForm p)) :=
-  normalFormAt p.size p rfl
+  computeNormalFormRec p.size p rfl
+
+/-! Named-expression entry points and their exact-agreement theorems. -/
 
 /-- Reuse elaboration, alpha-beta-eta canonicalization and OL normalization for
 identical named inputs. Malformed-input results are cached as well. -/
@@ -410,12 +425,12 @@ def prepareMemo (p : Expr) : StateM Cache (Answer (Orthologic.prepare p)) := by
     if (← get).config.preparation then
       modify fun c => {c with prepared := c.prepared.insert p result}
     return result
-  cases he : Lambda.interpretNamed p Lambda.Names.free with
+  cases he : AlphaBetaEtaNormalization.interpretNamed p AlphaBetaEtaNormalization.Names.free with
   | none => exact pure ⟨none, by simp [Orthologic.prepare, he]⟩
   | some e =>
     obtain ⟨s, e⟩ := e
     exact do
-      let result ← computeNormalFormMemo (SimpleExpr.ofTerm (Lambda.normalize e))
+      let result ← computeNormalFormMemo (SimpleExpr.ofTerm (AlphaBetaEtaNormalization.normalize e))
       return ⟨some ⟨s, result.val⟩, by simp [Orthologic.prepare, he, result.property]⟩
 
 def normalizeMemo (p : Expr) : StateM Cache (Answer (Orthologic.normalize p)) := by
@@ -429,8 +444,8 @@ def normalizeMemo (p : Expr) : StateM Cache (Answer (Orthologic.normalize p)) :=
   | some e =>
     obtain ⟨s, e⟩ := e
     exact do
-      let term ← termMemo e
-      return ⟨some (term.val.reify Lambda.Context.empty), by rw [term.property]; rfl⟩
+      let term ← toTermMemo e
+      return ⟨some (term.val.reify AlphaBetaEtaNormalization.Context.empty), by rw [term.property]; rfl⟩
 
 def isSameMemo (p q : Expr) : StateM Cache (Answer (Orthologic.isSame p q)) := by
   refine do

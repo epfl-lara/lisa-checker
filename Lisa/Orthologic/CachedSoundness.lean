@@ -1,8 +1,8 @@
 import Lisa.Orthologic.Cached
 import Lisa.Orthologic.ExpressionSoundness
 
-/-! The cached pipeline inherits soundness in Ordered αβη by exact agreement.
-No new reference relation or assumption about successful comparisons is needed. -/
+/-! The cached pipeline inherits soundness in Ordered αβη by exact agreement
+with the uncached functions. -/
 
 namespace Lisa.Orthologic.Cached
 

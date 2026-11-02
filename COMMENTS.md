@@ -7,23 +7,23 @@ Sort.lean
 Syntax.lean
 AlphaBetaEta.lean (on Lisa terms)
 
-### Lambda package (on intrinsically typed terms)
-2. Lambda.Syntax
-3. Lambda.AlphaBetaEta
-4. Lambda.Semantics
-5. Lambda.Evaluation
-6. Lambda.Normalization
-7. Lambda.Decision
-8. Lambda.Substitution
-9. Lambda.Erasure
-10. Lambda.Elaboration
-11. Lambda.NamedEnvironment
-12. Lambda.NamedAlpha
-13. Lambda.NamedSubstitution
-14. Lambda.NamedAlphaBetaEta
-15. Lambda.Reification
-16. Lambda.NamedReflection
-17. Lambda.NamedDecision
+### AlphaBetaEtaNormalization package (on intrinsically typed terms)
+2. AlphaBetaEtaNormalization.Syntax
+3. AlphaBetaEtaNormalization.AlphaBetaEta
+4. AlphaBetaEtaNormalization.Semantics
+5. AlphaBetaEtaNormalization.Evaluation
+6. AlphaBetaEtaNormalization.Normalization
+7. AlphaBetaEtaNormalization.Decision
+8. AlphaBetaEtaNormalization.Substitution
+9. AlphaBetaEtaNormalization.Erasure
+10. AlphaBetaEtaNormalization.Elaboration
+11. AlphaBetaEtaNormalization.NamedEnvironment
+12. AlphaBetaEtaNormalization.NamedAlpha
+13. AlphaBetaEtaNormalization.NamedSubstitution
+14. AlphaBetaEtaNormalization.NamedAlphaBetaEta
+15. AlphaBetaEtaNormalization.Reification
+16. AlphaBetaEtaNormalization.NamedReflection
+17. AlphaBetaEtaNormalization.NamedDecision
 
 ### Expression orders and proof systems
 Order.lean
@@ -72,7 +72,7 @@ The previous OL/Combined/Quantified implementation is kept in
 
 ## Notes for me
 
-- [NamedDecision.lean](NamedDecision.lean) provides the API for the Lambda package:
+- [NamedDecision.lean](NamedDecision.lean) provides the API for the AlphaBetaEtaNormalization package:
 
 ```lean
 compareNamed : Lisa.Expr → Lisa.Expr → Option Bool
@@ -82,15 +82,15 @@ normalizeNamed : Lisa.Expr → Option Lisa.Expr
 
 ## Comments
 
-### Lambda
+### AlphaBetaEtaNormalization
 [`Term`](Lisa/AlphaBetaEta.lean#L77) is a the type of lambda expr modulo conversion. But [`isTerm`](Lisa/Syntax.lean#L64) is a predicate on the type of lambda expr true for expressions of type `Ind`.
-[`Term`](Lisa/Lambda/Syntax.lean#L13) is a type of lambda expr in de Bruijn form.
+[`Term`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L13) is a type of lambda expr in de Bruijn form.
 
 The first isn't a great name.
 
-[`Ren`](Lisa/Lambda/Syntax.lean#L20) is not bijective in general so that's strange to me. Apparently it's not unheared of terminology in lambda calculus literature.
+[`Ren`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L20) is not bijective in general so that's strange to me. Apparently it's not unheared of terminology in lambda calculus literature.
 
-[`ground`](Lisa/Lambda/Semantics.lean#L18) If I understand correctly this is supposed to only take as arguments (in practice) Ind and Prop and not >>, and "ground sort" means either Ind or Prop. "ground" is confusing terminology as sorts don't contain variables, and it's weird that it can take arguments that it shouldn't.
+[`ground`](Lisa/AlphaBetaEtaNormalization/Semantics.lean#L18) If I understand correctly this is supposed to only take as arguments (in practice) Ind and Prop and not >>, and "ground sort" means either Ind or Prop. "ground" is confusing terminology as sorts don't contain variables, and it's weird that it can take arguments that it shouldn't.
 
 Why have explicit contexts mapping variables instead of annotated variables? That would have entirely avoided all dependencies on Gamma everywhere?
 
@@ -98,7 +98,7 @@ Normalization by Evaluation is complicated enough (to me) but it seems it is qui
 
 Also, why don't we track type intrinsically in Lisa's expressions, as we do in the actual Lisa checker? This would avoid the Elaboration machinery and make types available all the time, and guaranteed well-constructed?
 
-I understand there are two routes to transport [`Expr`](Lisa/Syntax.lean#L7) to [`Term`](Lisa/Lambda/Syntax.lean#L13):
+I understand there are two routes to transport [`Expr`](Lisa/Syntax.lean#L7) to [`Term`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L13):
 - `interpretNamed e (Names.free : Names [])`
 - `elaborate [] (e.toNameless [])`
 They are proven equivalent in NamedAlpha. Are they both necessary? Could we drop one?

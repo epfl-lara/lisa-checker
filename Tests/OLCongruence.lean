@@ -1,5 +1,5 @@
 import Lisa.AlphaBetaEtaOrder
-import Lisa.Lambda.NamedDecision
+import Lisa.AlphaBetaEtaNormalization.NamedDecision
 
 /-! A certified higher-order substitution example for the OL reorganization,
 along with checks distinguishing it from alpha-beta-eta conversion. -/
@@ -41,10 +41,10 @@ def bodyBackward : Ordered.ProofTree AlphaBetaEta {.var x} {and (.var x) top} :=
 -- Alpha-beta-eta conversion alone does not perform this logical simplification.
 example : ¬ AlphaBetaEta (.app (.var h) f) (.app (.var h) g) := by
   intro heq
-  have hn := (Lambda.alphaBetaEta_iff_normalizeNamed_eq
+  have hn := (AlphaBetaEtaNormalization.alphaBetaEta_iff_normalizeNamed_eq
     (s := prop) (p := .app (.var h) f) (q := .app (.var h) g) rfl).mp heq
-  have hne : Lambda.normalizeNamed (.app (.var h) f) ≠
-      Lambda.normalizeNamed (.app (.var h) g) := by decide
+  have hne : AlphaBetaEtaNormalization.normalizeNamed (.app (.var h) f) ≠
+      AlphaBetaEtaNormalization.normalizeNamed (.app (.var h) g) := by decide
   exact hne hn
 
 private def z : SVar := ⟨⟨"z", 0⟩, prop >> prop⟩

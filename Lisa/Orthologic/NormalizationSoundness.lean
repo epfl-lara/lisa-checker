@@ -43,24 +43,26 @@ theorem conj_map (ps : List (SimpleExpr prop)) (f : SimpleExpr prop → SimpleEx
 
 end ProvableEQ
 
-theorem inverse_sound (p : SimpleExpr prop) : ProvableEQ (inverse p) (.neg p) := by
-  unfold inverse
+theorem negate_sound (p : SimpleExpr prop) : ProvableEQ (negate p) (.neg p) := by
+  unfold negate
   split
   · exact ProvableEQ.of_le (ProvableLE.doubleNegIntro _) (ProvableLE.doubleNegElim _)
   · exact ProvableEQ.refl _
 
-/-- Refinement strengthens a factor, but only by consequences of the original
-context. This invariant is enough to preserve the whole conjunction. -/
+/-- The replacement implies the factor. Conversely, whenever the original
+conjunction implies the factor, it still implies the replacement. These two
+directions preserve the whole conjunction, without claiming that each factor
+is equivalent to its replacement in isolation. -/
 theorem refineFactor_sound (context : SimpleExpr prop) (positive : Bool)
     (p : SimpleExpr prop) (sign : Bool) :
-    ProvableLE (.conj (refineFactor context positive p sign)) (polar p sign) ∧
-    (ProvableLE context (polar p sign) →
+    ProvableLE (.conj (refineFactor context positive p sign)) (withPolarity p sign) ∧
+    (ProvableLE context (withPolarity p sign) →
       ProvableLE context (.conj (refineFactor context positive p sign))) := by
   unfold refineFactor
   split
   case h_1 =>
     obtain ⟨d, e⟩ := refineFactor_sound context positive _ (!sign)
-    exact ⟨d.trans (polar_neg _ _).symm.le, fun h => e (h.trans (polar_neg _ _).le)⟩
+    exact ⟨d.trans (withPolarity_neg _ _).symm.le, fun h => e (h.trans (withPolarity_neg _ _).le)⟩
   case h_2 =>
     rename_i ps
     constructor
@@ -131,10 +133,7 @@ theorem refineList_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
   have members (xs acc : List (SimpleExpr prop)) (q : SimpleExpr prop) :
       q ∈ xs.foldl (fun acc p => refineFactor (.conj ps) positive p true ++ acc) acc ↔
         q ∈ acc ∨ ∃ p ∈ xs, q ∈ refineFactor (.conj ps) positive p true := by
-    induction xs generalizing acc with
-    | nil => simp
-    | cons p xs ih => simp only [List.foldl_cons, ih, List.mem_append, List.mem_cons]
-                      aesop
+    simp [List.foldl_flip_append_eq_append, List.mem_flatten, or_comm]
   apply ProvableEQ.of_le
   · apply ProvableLE.conj_right
     intro p hp
@@ -152,13 +151,13 @@ theorem refineList_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
     · exact ((refineFactor_sound (.conj ps) positive p true).2
         (ProvableLE.conj_member _ hp)).trans (ProvableLE.conj_member _ hq)
 
-theorem reduceList_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
-    ProvableEQ (.conj (reduceList ps positive)) (.conj ps) := by
-  unfold reduceList
+theorem simplifyFactors_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
+    ProvableEQ (.conj (simplifyFactors ps positive)) (.conj ps) := by
+  unfold simplifyFactors
   exact (pruneFactors_sound _ _).trans (by simpa using refineList_sound ps positive)
 
 theorem assemble_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
-    ProvableEQ (assemble ps positive) (polar (.conj ps) positive) := by
+    ProvableEQ (assemble ps positive) (withPolarity (.conj ps) positive) := by
   have h : ProvableEQ (match ps with | [] => .top | [p] => p | ps => .conj ps) (.conj ps) := by
     cases ps with
     | nil => exact ProvableEQ.conj_empty.symm
@@ -166,7 +165,7 @@ theorem assemble_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
       | nil => exact (ProvableEQ.conj_singleton p).symm
       | cons q qs => exact ProvableEQ.refl _
   cases positive
-  · exact (inverse_sound _).trans h.neg
+  · exact (negate_sound _).trans h.neg
   · exact h
 
 theorem contradiction_sound (ps : List (SimpleExpr prop)) (positive : Bool)
@@ -188,19 +187,19 @@ theorem contradiction_sound (ps : List (SimpleExpr prop)) (positive : Bool)
     (isFormula_neg (show isFormula Expr.top from rfl)) result
     (Derivation.bot_le (isFormula_neg (show isFormula Expr.top from rfl))))
 
-theorem reduce_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
-    ProvableEQ (reduce ps positive) (polar (.conj ps) positive) := by
-  unfold reduce
+theorem normalizeConjunction_sound (ps : List (SimpleExpr prop)) (positive : Bool) :
+    ProvableEQ (normalizeConjunction ps positive) (withPolarity (.conj ps) positive) := by
+  unfold normalizeConjunction
   dsimp only
   split
   · rename_i h
     have hb := ProvableEQ.of_le (contradiction_sound _ _ h) (ProvableLE.bot _)
-    have he := (reduceList_sound ps positive).polar positive
+    have he := (simplifyFactors_sound ps positive).withPolarity positive
     cases positive
     · apply ProvableEQ.trans _ he
       exact (ProvableEQ.of_le (ProvableLE.doubleNegIntro .top) (ProvableLE.doubleNegElim .top)).trans hb.symm.neg
     · exact hb.symm.trans he
-  · exact (assemble_sound _ _).trans ((reduceList_sound ps positive).polar positive)
+  · exact (assemble_sound _ _).trans ((simplifyFactors_sound ps positive).withPolarity positive)
 
 theorem normalizeEquality_sound (a b : SimpleExpr ind) :
     ProvableEQ (normalizeEquality a b) (.equal a b) := by
@@ -248,45 +247,22 @@ theorem normalizeAll_sound (p : SimpleExpr prop) : ProvableEQ (normalizeAll p) (
 
 /-- Every local rewrite and every recursive child normalization preserves
 contextual equivalence, including at higher-order sorts. -/
-private theorem normalForm_sound_size (n : Nat) :
-    ∀ {s} (p : SimpleExpr s), p.size = n → ProvableEQ (computeNormalForm p) p := by
-  induction n using Nat.strong_induction_on with | h n ih =>
-  intro s p hn
-  have child {s} (p : SimpleExpr s) (lt : p.size < n) := ih _ lt p rfl
-  unfold computeNormalForm
-  split
-  case h_1 => exact ProvableEQ.refl _
-  case h_2 => exact ProvableEQ.refl _
-  case h_3 => exact ProvableEQ.refl _
-  case h_4 =>
-    exact ProvableEQ.app (child _ (by simp only [SimpleExpr.size] at hn; omega))
-      (child _ (by simp only [SimpleExpr.size] at hn; omega))
-  case h_5 => exact ProvableEQ.lam _ (child _ (by simp only [SimpleExpr.size] at hn; omega))
-  case h_6 => exact ProvableEQ.refl _
-  case h_7 =>
-    apply (reduce_sound _ true).trans
-    simp only [polar, ↓reduceIte, List.attach_map_val]
-    apply ProvableEQ.conj_map
-    intro q hq
-    exact child q (by have := size_lt_conj hq; omega)
-  case h_8 =>
-    apply (reduce_sound _ false).trans
-    simp only [polar, Bool.false_eq_true, ↓reduceIte, List.attach_map_val]
-    apply ProvableEQ.neg
-    apply ProvableEQ.conj_map
-    intro q hq
-    exact child q (by have := size_lt_conj hq; simp only [SimpleExpr.size] at hn this; omega)
-  case h_9 =>
-    exact (inverse_sound _).trans (child _ (by simp only [SimpleExpr.size] at hn; omega)).neg
-  case h_10 =>
-    exact (normalizeAll_sound _).trans (child _ (by simp only [SimpleExpr.size] at hn; omega)).all
-  case h_11 =>
-    exact (normalizeEquality_sound _ _).trans
-      (ProvableEQ.equal (child _ (by simp only [SimpleExpr.size] at hn; omega))
-        (child _ (by simp only [SimpleExpr.size] at hn; omega)))
-
-theorem computeNormalForm_sound (p : SimpleExpr s) : ProvableEQ (computeNormalForm p) p :=
-  normalForm_sound_size _ p rfl
+theorem computeNormalForm_sound (p : SimpleExpr s) : ProvableEQ (computeNormalForm p) p := by
+  fun_induction computeNormalForm p
+  case case1 | case2 | case3 | case6 => exact ProvableEQ.refl _
+  case case4 => apply ProvableEQ.app <;> assumption
+  case case5 => apply ProvableEQ.lam; assumption
+  case case7 ps ih =>
+    apply (normalizeConjunction_sound _ true).trans
+    simpa only [withPolarity, ↓reduceIte, List.attach_map_val] using
+      ProvableEQ.conj_map ps computeNormalForm (fun q hq => ih ⟨q, hq⟩)
+  case case8 ps ih =>
+    apply (normalizeConjunction_sound _ false).trans
+    simpa only [withPolarity, Bool.false_eq_true, ↓reduceIte, List.attach_map_val] using
+      (ProvableEQ.conj_map ps computeNormalForm (fun q hq => ih ⟨q, hq⟩)).neg
+  case case9 q _ ih => exact (negate_sound _).trans ih.neg
+  case case10 q ih => exact (normalizeAll_sound _).trans ih.all
+  case case11 a b iha ihb => exact (normalizeEquality_sound _ _).trans (ProvableEQ.equal iha ihb)
 
 theorem normalizedLEQ_sound {p q : SimpleExpr prop}
     (h : latticesLEQ (computeNormalForm p) (computeNormalForm q) = true) : ProvableLE p q :=

@@ -11,14 +11,18 @@ terminates structurally or by the size of the expression being inspected.
 namespace Lisa.Orthologic
 open SimpleExpr
 
-/-- Invert a formula, cancelling an existing negation. -/
-def inverse : SimpleExpr prop → SimpleExpr prop
+/-- Negate a formula, cancelling an existing negation. -/
+def negate : SimpleExpr prop → SimpleExpr prop
   | .neg p => p
   | p => .neg p
 
-/-- Flatten a factor, and refine a negative conjunction when the whole original
-conjunction already implies the negation of one of its children. The negative
-outer polarity uses the dual comparison, as in the Scala implementation. -/
+/-- Simplify one factor using the original conjunction `context`.
+
+`positive` is the polarity of the whole conjunction; `sign` is the polarity of
+the current factor `p`. Descending through a negation flips only `sign`.
+Positive conjunctions are flattened. A negative conjunction is replaced by the
+negation of one child when `context` justifies that choice. Negative outer
+polarity uses the dual comparison. `context` stays fixed throughout recursion. -/
 def refineFactor (context : SimpleExpr prop) (positive : Bool)
     (p : SimpleExpr prop) (sign : Bool) : List (SimpleExpr prop) :=
   match p, sign with
@@ -29,7 +33,7 @@ def refineFactor (context : SimpleExpr prop) (positive : Bool)
         else polarLEQ p.val true context false) with
       | some p => refineFactor context positive p.val false
       | none => [.neg (.conj ps)]
-  | p, s => [polar p s]
+  | p, s => [withPolarity p s]
 termination_by p.size
 decreasing_by
   all_goals try simp only [SimpleExpr.size]
@@ -45,7 +49,9 @@ def pruneFactors (accepted : List (SimpleExpr prop)) :
       if latticesLEQ (.conj (ps ++ accepted)) p then pruneFactors accepted ps
       else pruneFactors (p :: accepted) ps
 
-def reduceList (ps : List (SimpleExpr prop)) (positive : Bool) : List (SimpleExpr prop) :=
+/-- Refine factors against the original conjunction, then remove redundant ones.
+Prepending each refined block fixes the order in which pruning visits them. -/
+def simplifyFactors (ps : List (SimpleExpr prop)) (positive : Bool) : List (SimpleExpr prop) :=
   let context := SimpleExpr.conj ps
   let flattened := ps.foldl (fun acc p => refineFactor context positive p true ++ acc) []
   pruneFactors [] flattened
@@ -56,14 +62,15 @@ def assemble (ps : List (SimpleExpr prop)) (positive : Bool) : SimpleExpr prop :
     | [] => .top
     | [p] => p
     | ps => .conj ps
-  if positive then p else inverse p
+  if positive then p else negate p
 
 def checkForContradiction (ps : List (SimpleExpr prop)) (positive : Bool) : Bool :=
   if positive then ps.any (fun p => polarLEQ (.conj ps) true p false)
   else ps.any (fun p => polarLEQ p true (.conj ps) false)
 
-def reduce (ps : List (SimpleExpr prop)) (positive : Bool) : SimpleExpr prop :=
-  let qs := reduceList ps positive
+/-- Normalize a conjunction, or its negation when `positive` is false. -/
+def normalizeConjunction (ps : List (SimpleExpr prop)) (positive : Bool) : SimpleExpr prop :=
+  let qs := simplifyFactors ps positive
   if checkForContradiction qs positive then (if positive then .neg .top else .top)
   else assemble qs positive
 
@@ -88,9 +95,9 @@ def computeNormalForm : SimpleExpr s → SimpleExpr s
   | .app f a => .app (computeNormalForm f) (computeNormalForm a)
   | .lam s b => .lam s (computeNormalForm b)
   | .top => .top
-  | .conj ps => reduce (ps.attach.map fun p => computeNormalForm p.val) true
-  | .neg (.conj ps) => reduce (ps.attach.map fun p => computeNormalForm p.val) false
-  | .neg p => inverse (computeNormalForm p)
+  | .conj ps => normalizeConjunction (ps.attach.map fun p => computeNormalForm p.val) true
+  | .neg (.conj ps) => normalizeConjunction (ps.attach.map fun p => computeNormalForm p.val) false
+  | .neg p => negate (computeNormalForm p)
   | .all p => normalizeAll (computeNormalForm p)
   | .equal a b => normalizeEquality (computeNormalForm a) (computeNormalForm b)
 termination_by p => p.size

@@ -10,4 +10,4 @@ import Lisa.OrderedComparison
 import Lisa.Orthologic.ExpressionSoundness
 import Lisa.Orthologic.CachedSoundness
 import Lisa.Checker
-import Lisa.SCLambdaToPure
+import Lisa.LambdaFol

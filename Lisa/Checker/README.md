@@ -2,7 +2,7 @@
 
 The checker uses one expression comparison pipeline:
 
-1. Elaborate and canonicalize by αβη using `Lambda`.
+1. Elaborate and canonicalize by αβη using `AlphaBetaEtaNormalization`.
 2. Normalize by extended orthologic, recursively including formulas inside
    terms and higher-order arguments.
 3. Compare normal forms with `latticesEQ` for equivalence or `latticesLEQ`

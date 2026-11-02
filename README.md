@@ -13,28 +13,28 @@ lake exe lisa-checker [--limit N] [--closed] [--trace] PREFIX|DIRECTORY ...
 
 See the [project walkthrough](Lisa/WALKTHROUGH.md),
 [checker guide](Lisa/Checker/README.md), and
-[orthologic implementation plan and status](Lisa/Orthologic/REORGANIZATION_PLAN.md).
+[orthologic package guide](Lisa/Orthologic/README.md).
 The previous OL implementation is retained for reference in
 [Archive/Orthologic](Archive/Orthologic/README.md), outside the active build.
 
-The conservativity development is in [Lisa/SCLambdaToPure](Lisa/SCLambdaToPure.lean).
-The [final theorem](Lisa/SCLambdaToPure/Statements.lean), `ordered_iff_pure`, proves that
+The conservativity development is in [Lisa/LambdaFol](Lisa/LambdaFol.lean).
+The [final theorem](Lisa/LambdaFol/Statements.lean), `ordered_iff_pureFol`, proves that
 `Ordered AlphaBetaEta` and independent first-order logic with epsilon prove the
-same boundary sequents. Both directions are syntactic proof translations;
+same sequents under the first-order conclusion restrictions. Both directions are syntactic proof translations;
 intermediate source formulas may contain higher-order symbols.
-[Expression representation](Lisa/SCLambdaToPure/AToPure/Reverse/Equivalence.lean)
-also proves that canonical readback embeds back to an αβη-equivalent expression.
-The forward proof follows **Ordered → B → A → Pure**: pass to αβη formula
-classes, eliminate schematic instantiation, then ground and normalize. A and B
-retain generalized replacement and epsilon; only B has instantiation. Their
-[boundary equivalences](Lisa/SCLambdaToPure/Statements.lean) use the
+[Expression representation](Lisa/LambdaFol/ToPureFol/PureFolToOrdered/Equivalence.lean)
+also proves that the canonical PureFol translation embeds back to an αβη-equivalent expression.
+The forward proof follows **Ordered → LambdaFol → WithoutInstantiation → PureFol**: pass to αβη formula
+classes, eliminate schematic instantiation, then replace higher-order symbols and normalize.
+WithoutInstantiation and LambdaFol retain generalized replacement and epsilon; only LambdaFol has instantiation. Their
+[equivalence theorems](Lisa/LambdaFol/Statements.lean) use the
 same independent target.
 
-The [reduction guide](Lisa/SCLambdaToPure/README.md) explains the boundary,
-the three entry files (`Pure`, `A`, `Statements`) and the supporting
-`AToPure` and `OrderedToA` directories. Pure uses the same free identifiers
-as Lisa and retains epsilon; assumptions are sequent antecedents. The package
-contains one syntactic proof route, without optional model-theoretic developments.
+The [reduction guide](Lisa/LambdaFol/README.md) explains the conclusion restrictions,
+the shared `Syntax`, the calculi (`ProofSystem`, `WithoutInstantiation`, `PureFol`),
+and the final `Statements`. Supporting proofs live in `FromOrdered`,
+`EliminateInstantiation`, and `ToPureFol`. PureFol uses the same free identifiers
+as Lisa and retains epsilon; assumptions are sequent antecedents. The proof translations are syntactic.
 
 Earlier approaches remain outside the active build in
 [Archive/SCLambdaMathlib](Archive/SCLambdaMathlib) and

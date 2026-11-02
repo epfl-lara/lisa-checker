@@ -22,5 +22,5 @@ instance : RelationCongruence AlphaBetaEta where
 
 instance : ProofOrder AlphaBetaEta := ProofOrder.of _
 
-/-- Lambda-FOL with alpha-beta-eta conversion as its only auxiliary relation. -/
+/-- LambdaFOL with alpha-beta-eta conversion as its only auxiliary relation. -/
 abbrev Ordered.AlphaBetaEtaProof := Ordered.ProofTree AlphaBetaEta

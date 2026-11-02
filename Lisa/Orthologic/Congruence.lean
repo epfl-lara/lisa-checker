@@ -17,10 +17,7 @@ namespace ContextEq
 variable {s t : LSort} {k p q r : Expr}
 
 theorem app_sort (hk : k.hasSort (s >> t)) (hp : p.hasSort s) :
-    (Expr.app k p).hasSort t := by
-  change k.sort = some (s >> t) at hk
-  change p.sort = some s at hp
-  simp [hasSort, Expr.sort, hk, hp]
+    (Expr.app k p).hasSort t := Derivation.app_sort hk hp
 
 theorem refl (hp : p.hasSort s) : ContextEq s p p := by
   intro k hk
@@ -49,14 +46,14 @@ theorem of_pointwise (hp : p.hasSort s) (xs : List SVar)
     (d : Nonempty (Theorem ((SubstPair.mk p q).pointwiseEq xs))) : ContextEq s p q := by
   intro k hk
   obtain ⟨d⟩ := d
-  let z := Lambda.Context.empty.fresh k.freeVars s
-  have hz := Lambda.Context.empty.fresh_not_mem k.freeVars s
+  let z := AlphaBetaEtaNormalization.Context.empty.fresh k.freeVars s
+  have hz := AlphaBetaEtaNormalization.Context.empty.fresh_not_mem k.freeVars s
   have hbody : isFormula (.app k (.var z)) := app_sort hk rfl
   have valid := replacement_valid (z := z) (xs := xs) hbody hp hv
   have forward := replace (replacement z (.app k (.var z)) p q xs) valid d
   have backward := replace_reverse (replacement z (.app k (.var z)) p q xs) valid d
   have hc (e : Expr) : AlphaBetaEta (substOne z e (.app k (.var z))) (.app k e) := by
-    simpa [substOne, Expr.subst, Subst.subst, Lambda.NamedSubst.lookup_insert] using
+    simpa [substOne, Expr.subst, Subst.subst, AlphaBetaEtaNormalization.NamedSubst.lookup_insert] using
       AlphaBetaEta.app (substOne_fresh hk z e hz) (.refl e)
   exact ⟨⟨convert valid.2.2.2.1 valid.2.2.2.2 (hc p) (hc q) forward⟩,
     ⟨convert valid.2.2.2.2 valid.2.2.2.1 (hc q) (hc p) backward⟩⟩
@@ -78,7 +75,7 @@ theorem formula (hp : isFormula p) (hq : isFormula q) (h : ContextEq prop p q) :
   let k : Expr := .lam x (.var x)
   have hk : k.hasSort (prop >> prop) := rfl
   have beta (e : Expr) (he : isFormula e) : AlphaBetaEta (.app k e) e := by
-    simpa [substOne, Expr.subst, Subst.subst, Lambda.NamedSubst.lookup_insert] using
+    simpa [substOne, Expr.subst, Subst.subst, AlphaBetaEtaNormalization.NamedSubst.lookup_insert] using
       AlphaBetaEta.beta x (.var x) e he
   obtain ⟨⟨d⟩, ⟨e⟩⟩ := h k hk
   exact ⟨⟨convert (app_sort hk hp) (app_sort hk hq) (beta p hp) (beta q hq) d⟩,
@@ -88,7 +85,7 @@ theorem formula (hp : isFormula p) (hq : isFormula q) (h : ContextEq prop p q) :
 def freshArgs : List LSort → Finset SVar → List SVar
   | [], _ => []
   | s :: ss, avoid =>
-      let x := Lambda.Context.empty.fresh avoid s
+      let x := AlphaBetaEtaNormalization.Context.empty.fresh avoid s
       x :: freshArgs ss (insert x avoid)
 
 theorem freshArgs_properties (ss : List LSort) (avoid : Finset SVar) :
@@ -97,9 +94,9 @@ theorem freshArgs_properties (ss : List LSort) (avoid : Finset SVar) :
   induction ss generalizing avoid with
   | nil => simp [freshArgs]
   | cons s ss ih =>
-      let x := Lambda.Context.empty.fresh avoid s
+      let x := AlphaBetaEtaNormalization.Context.empty.fresh avoid s
       obtain ⟨hs, hn, hf⟩ := ih (insert x avoid)
-      have hx := Lambda.Context.empty.fresh_not_mem avoid s
+      have hx := AlphaBetaEtaNormalization.Context.empty.fresh_not_mem avoid s
       refine ⟨by simpa [freshArgs, x] using congrArg (List.cons s) hs, ?_, ?_⟩
       · exact List.nodup_cons.mpr ⟨fun h => hf x h (Finset.mem_insert_self _ _), hn⟩
       · intro y hy
@@ -131,13 +128,13 @@ theorem app_left {f g a : Expr} (hf : f.hasSort (s >> t)) (hg : g.hasSort (s >> 
     (ha : a.hasSort s) (h : ContextEq (s >> t) f g) :
     ContextEq t (.app f a) (.app g a) := by
   intro k hk
-  let z := Lambda.Context.empty.fresh (k.freeVars ∪ a.freeVars) (s >> t)
-  have hz := Lambda.Context.empty.fresh_not_mem (k.freeVars ∪ a.freeVars) (s >> t)
+  let z := AlphaBetaEtaNormalization.Context.empty.fresh (k.freeVars ∪ a.freeVars) (s >> t)
+  have hz := AlphaBetaEtaNormalization.Context.empty.fresh_not_mem (k.freeVars ∪ a.freeVars) (s >> t)
   have hb : isFormula (.app k (.app (.var z) a)) := app_sort hk (app_sort rfl ha)
   obtain ⟨⟨d⟩, ⟨e⟩⟩ := substitute (z := z) hf hg h hb
   have cv (f : Expr) : AlphaBetaEta
       (substOne z f (.app k (.app (.var z) a))) (.app k (.app f a)) := by
-    simpa [substOne, Expr.subst, Subst.subst, Lambda.NamedSubst.lookup_insert] using
+    simpa [substOne, Expr.subst, Subst.subst, AlphaBetaEtaNormalization.NamedSubst.lookup_insert] using
       AlphaBetaEta.app (substOne_fresh hk z f (fun hm => hz (Finset.mem_union_left _ hm)))
         (.app (.refl f) (substOne_fresh ha z f (fun hm => hz (Finset.mem_union_right _ hm))))
   have hs (f : Expr) (hf : f.hasSort (s >> t)) :
@@ -150,13 +147,13 @@ theorem app_right {f a b : Expr} (hf : f.hasSort (s >> t))
     (ha : a.hasSort s) (hb : b.hasSort s) (h : ContextEq s a b) :
     ContextEq t (.app f a) (.app f b) := by
   intro k hk
-  let z := Lambda.Context.empty.fresh (k.freeVars ∪ f.freeVars) s
-  have hz := Lambda.Context.empty.fresh_not_mem (k.freeVars ∪ f.freeVars) s
+  let z := AlphaBetaEtaNormalization.Context.empty.fresh (k.freeVars ∪ f.freeVars) s
+  have hz := AlphaBetaEtaNormalization.Context.empty.fresh_not_mem (k.freeVars ∪ f.freeVars) s
   have hc : isFormula (.app k (.app f (.var z))) := app_sort hk (app_sort hf rfl)
   obtain ⟨⟨d⟩, ⟨e⟩⟩ := substitute (z := z) ha hb h hc
   have cv (a : Expr) : AlphaBetaEta
       (substOne z a (.app k (.app f (.var z)))) (.app k (.app f a)) := by
-    simpa [substOne, Expr.subst, Subst.subst, Lambda.NamedSubst.lookup_insert] using
+    simpa [substOne, Expr.subst, Subst.subst, AlphaBetaEtaNormalization.NamedSubst.lookup_insert] using
       AlphaBetaEta.app (substOne_fresh hk z a (fun hm => hz (Finset.mem_union_left _ hm)))
         (.app (substOne_fresh hf z a (fun hm => hz (Finset.mem_union_right _ hm))) (.refl a))
   have hs (a : Expr) (ha : a.hasSort s) :
@@ -171,6 +168,13 @@ theorem app {f g a b : Expr} (hf : f.hasSort (s >> t)) (hg : g.hasSort (s >> t))
     ContextEq t (.app f a) (.app g b) :=
   trans (app_sort hf ha) (app_sort hg ha) (app_sort hg hb)
     (app_left hf hg ha h) (app_right hg ha hb j)
+
+/-- Apply a fixed binary function to two contextually equivalent arguments. -/
+theorem app₂ {u : LSort} {f a a' b b' : Expr} (hf : f.hasSort (s >> t >> u))
+    (ha : a.hasSort s) (ha' : a'.hasSort s) (hb : b.hasSort t) (hb' : b'.hasSort t)
+    (h : ContextEq s a a') (j : ContextEq t b b') :
+    ContextEq u (.app (.app f a) b) (.app (.app f a') b') :=
+  app (app_sort hf ha) (app_sort hf ha') hb hb' (app_right hf ha ha' h) j
 
 theorem applied (hp : p.hasSort s) (hq : q.hasSort s) (h : ContextEq s p q)
     (xs : List SVar) (hx : xs.map SVar.sort = s.splitArgs.1) :
@@ -190,16 +194,10 @@ theorem applied (hp : p.hasSort s) (hq : q.hasSort s) (h : ContextEq s p q)
 
 theorem individual (hp : isTerm p) (hq : isTerm q) (h : ContextEq ind p q) :
     Nonempty (Theorem (eq p q)) := by
-  let z := Lambda.Context.empty.fresh p.freeVars ind
-  have hz := Lambda.Context.empty.fresh_not_mem p.freeVars ind
-  have hb : isFormula (eq p (.var z)) := isFormula_eq hp rfl
-  obtain ⟨⟨d⟩, _⟩ := substitute (z := z) hp hq h hb
-  have cv (a : Expr) : AlphaBetaEta (substOne z a (eq p (.var z))) (eq p a) := by
-    simpa [eq, substOne, Expr.subst, Subst.subst, Lambda.NamedSubst.lookup_insert] using
-      AlphaBetaEta.app (.app (.refl _) (substOne_fresh hp z a hz)) (.refl a)
-  have d' := convert ((cv p).preserves_sort.trans (isFormula_eq hp hp))
-    ((cv q).preserves_sort.trans (isFormula_eq hp hq)) (cv p) (cv q) d
-  exact ⟨modusPonens (isFormula_eq hp hp) (isFormula_eq hp hq) (.rightRefl p hp) d'⟩
+  have hk : (Expr.app (.const (SConst.named "eq" (ind >> ind >> prop))) p).hasSort
+      (ind >> prop) := app_sort rfl hp
+  obtain ⟨⟨d⟩, _⟩ := h _ hk
+  exact ⟨modusPonens (isFormula_eq hp hp) (isFormula_eq hp hq) (.rightRefl p hp) d⟩
 
 theorem pointwise (hp : p.hasSort s) (hq : q.hasSort s) (h : ContextEq s p q)
     (xs : List SVar) (hx : xs.map SVar.sort = s.splitArgs.1) :
@@ -244,5 +242,63 @@ theorem lam (x : SVar) (hp : p.hasSort s) (hq : q.hasSort s) (h : ContextEq s p 
   obtain ⟨d⟩ := pointwise hp hq h xs hxs
   exact of_pointwise hpl (x :: xs) hvl ⟨lam_pointwise x p q s xs hp hv d⟩
 
+/-- Transport contextual equivalence along αβη conversions of both expressions. -/
+theorem convert (hp : p.hasSort s) (hq : q.hasSort s)
+    (hpp : AlphaBetaEta p p') (hqq : AlphaBetaEta q q')
+    (h : ContextEq s p q) : ContextEq s p' q' :=
+  trans (hpp.preserves_sort.symm.trans hp) hp (hqq.preserves_sort.symm.trans hq)
+    (of_conversion (hpp.preserves_sort.symm.trans hp) hpp.symm)
+    (trans hp hq (hqq.preserves_sort.symm.trans hq) h (of_conversion hq hqq))
+
 end ContextEq
+
+namespace Derivation
+noncomputable section
+
+/-! Application rules from pointwise comparisons. These specialize contextual
+equivalence to produce individual Ordered derivations. -/
+
+set_option linter.unusedVariables false in
+/-- Argument congruence at any result sort, observed in a formula context `k`.
+Taking `k = λw. body` covers any formula containing the application. The supplied
+theorem compares the arguments fully applied to fresh independent variables. -/
+def app_argument (z : SVar) (k f a b : Expr) (xs : List SVar) (t : LSort)
+    (hk : k.hasSort (t >> prop)) (hf : f.hasSort (z.sort >> t)) (ha : a.hasSort z.sort)
+    (hab : (SubstPair.mk a b).validParams xs) (hz : z ∉ k.freeVars ∪ f.freeVars)
+    (d : Theorem ((SubstPair.mk a b).pointwiseEq xs)) :
+    Entails (.app k (.app f a)) (.app k (.app f b)) := by
+  have hb : b.hasSort z.sort := hab.1.2.symm.trans ha
+  exact Classical.choice ((ContextEq.app_right hf ha hb
+    (ContextEq.of_pointwise ha xs hab ⟨d⟩)) k hk).1
+
+set_option linter.unusedVariables false in
+/-- The function position of an application obeys the same replacement rule. -/
+def app_function (z : SVar) (k f g a : Expr) (xs : List SVar) (s t : LSort)
+    (hzs : z.sort = s >> t) (hk : k.hasSort (t >> prop))
+    (hf : f.hasSort z.sort) (ha : a.hasSort s)
+    (hfg : (SubstPair.mk f g).validParams xs) (hz : z ∉ k.freeVars ∪ a.freeVars)
+    (d : Theorem ((SubstPair.mk f g).pointwiseEq xs)) :
+    Entails (.app k (.app f a)) (.app k (.app g a)) := by
+  have hf' : f.hasSort (s >> t) := hzs ▸ hf
+  have hg : g.hasSort (s >> t) := hfg.1.2.symm.trans hf'
+  have h := ContextEq.of_pointwise hf xs hfg ⟨d⟩
+  exact Classical.choice ((ContextEq.app_left hf' hg ha (hzs ▸ h)) k hk).1
+
+/-- Both application components may be replaced. Results can have any sort;
+`k` observes them in an arbitrary formula context. The two pointwise comparisons
+justify replacement of the function and argument. -/
+def app_congr (k f g a b : Expr) (s t : LSort) (xs ys : List SVar)
+    (hk : k.hasSort (t >> prop)) (hf : f.hasSort (s >> t)) (ha : a.hasSort s)
+    (hfg : (SubstPair.mk f g).validParams xs) (hab : (SubstPair.mk a b).validParams ys)
+    (df : Theorem ((SubstPair.mk f g).pointwiseEq xs))
+    (da : Theorem ((SubstPair.mk a b).pointwiseEq ys)) :
+    Entails (.app k (.app f a)) (.app k (.app g b)) := by
+  have hg : g.hasSort (s >> t) := hfg.1.2.symm.trans hf
+  have hb : b.hasSort s := hab.1.2.symm.trans ha
+  exact Classical.choice ((ContextEq.app hf hg ha hb
+    (ContextEq.of_pointwise hf xs hfg ⟨df⟩)
+    (ContextEq.of_pointwise ha ys hab ⟨da⟩)) k hk).1
+
+end
+end Derivation
 end Lisa.Orthologic

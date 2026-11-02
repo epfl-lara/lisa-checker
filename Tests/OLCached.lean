@@ -1,7 +1,6 @@
 import Lisa.Orthologic.CachedSoundness
 
-/-! Exact agreement, cache reuse, and binding-sensitive regression tests for the
-new LambdaFOL cache. This does not exercise the legacy Nnf/Combined cache. -/
+/-! Exact agreement, cache reuse, and binding-sensitive regression tests. -/
 namespace OLCachedTests
 open Lisa Lisa.Orthologic
 open SimpleExpr
@@ -140,7 +139,7 @@ private def sharedDag : Nat → SimpleExpr prop
     throw (IO.userError "Warm normalization recomputed a subtree")
 
 -- Exact keys distinguish an explicit application from its logical constructor,
--- even when both erase to the same Lambda term.
+-- even when both erase to the same AlphaBetaEtaNormalization term.
 private def rawAnd : SimpleExpr prop :=
   .app (.app (.const ⟨"and", 0⟩) p) .top
 #guard rawAnd.toTerm = (SimpleExpr.conj [p, .top]).toTerm
@@ -173,7 +172,7 @@ private def rawAnd : SimpleExpr prop :=
     unless result.val == computeNormalForm key.2 do
       throw (IO.userError "Collision returned another query's result")
 
--- Agreement for arbitrary caches, together with soundness in the existing system.
+-- Agreement for arbitrary caches, together with soundness in Ordered αβη.
 example (cache : Cached.Cache) (p : SimpleExpr s) :
     ((Cached.computeNormalFormMemo p).run' cache).val = computeNormalForm p :=
   ((Cached.computeNormalFormMemo p).run' cache).property
@@ -190,3 +189,16 @@ example (cache : Cached.Cache) (p q : Expr)
 #print axioms Cached.isImplying_sound
 
 end OLCachedTests
+
+-- Only the standard Lean axioms are permitted in these results.
+open Lean Elab Command in
+run_elab do
+  for root in [``Lisa.Orthologic.polarLEQ_sound, ``Lisa.Orthologic.latticesEQ_sound,
+      ``Lisa.Orthologic.computeNormalForm_sound, ``Lisa.Orthologic.SimpleExpr.ofTerm_sound,
+      ``Lisa.Orthologic.isSame_sound, ``Lisa.Orthologic.isImplying_sound,
+      ``Lisa.Orthologic.Cached.normalize_eq, ``Lisa.Orthologic.Cached.isSameMemo_eq,
+      ``Lisa.Orthologic.Cached.isImplyingMemo_eq, ``Lisa.Orthologic.Cached.isSame_sound,
+      ``Lisa.Orthologic.Cached.isImplying_sound] do
+    for axiomName in ← collectAxioms root do
+      unless [``propext, ``Classical.choice, ``Quot.sound].contains axiomName do
+        throwError "Unexpected axiom {axiomName} in {root}"

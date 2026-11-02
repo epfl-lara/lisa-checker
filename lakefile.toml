@@ -33,10 +33,10 @@ roots = [
   "Tests.NamedDecision",
   "Tests.OrderSimulation",
   "Tests.SerializedCorpus",
-  "Tests.SCLambdaToPure",
-  "Tests.PureEpsilon",
-  "Lisa.Lambda.CoreTests",
-  "Lisa.Lambda.Tests"
+  "Tests.LambdaFol",
+  "Tests.PureFolEpsilon",
+  "Lisa.AlphaBetaEtaNormalization.CoreTests",
+  "Lisa.AlphaBetaEtaNormalization.Tests"
 ]
 
 [[lean_exe]]

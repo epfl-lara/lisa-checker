@@ -10,7 +10,7 @@ arbitrary applications require equivalence of both components.
 
 There is no fuel or quantifier-depth limit. The termination measure is twice
 the sum of the two tree sizes, plus one for EQ's calls to LEQ at the same size.
-The uncached identity shortcut compares erased Lambda terms. `Cached.lean`
+The uncached identity shortcut compares erased lambda terms. `Cached.lean`
 reuses those terms and memoizes recursive comparisons with exact-agreement proofs.
 -/
 
@@ -18,7 +18,7 @@ namespace Lisa.Orthologic
 open SimpleExpr
 
 /-- Interpret the Boolean polarity as a formula, without changing its binding. -/
-def polar (p : SimpleExpr prop) (positive : Bool) : SimpleExpr prop :=
+def withPolarity (p : SimpleExpr prop) (positive : Bool) : SimpleExpr prop :=
   if positive then p else .neg p
 
 mutual

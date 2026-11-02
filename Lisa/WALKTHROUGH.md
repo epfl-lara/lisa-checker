@@ -1,6 +1,6 @@
 # Orders and proof systems in Lisa
 
-This guide covers the next layer after [the Lambda package](Lambda/README.md): the interfaces for comparing expressions, two presentations of sequent proofs, and the translations between them.
+This guide covers the next layer after [the AlphaBetaEtaNormalization package](AlphaBetaEtaNormalization/README.md): the interfaces for comparing expressions, two presentations of sequent proofs, and the translations between them.
 
 The purpose of this layer is to describe **which proof steps the checker may accept and how flexible proof steps can be justified by more explicit ones**. It does not yet implement the concrete comparison algorithm or the executable checker.
 
@@ -30,7 +30,7 @@ Ordered + Weakened → OrderedWeakened
 
 `OrderSimulation` can be read immediately after `Order`; its later position makes its purpose easier to appreciate. `AlphaBetaEtaOrder` supplies the baseline instance without defining another proof datatype.
 
-[Orthologic/Basic.lean](Orthologic/Basic.lean), described below for background, is now needed only when reading the orthologic implementation. It is not a dependency of `Order.lean`.
+The [Orthologic package](Orthologic/README.md) supplies the executable comparison algorithm and its soundness proofs. It is not a dependency of `Order.lean`.
 
 ## What a sequent and a proof tree mean
 
@@ -60,7 +60,7 @@ The trees live in `Type`. Therefore, the statement that a derivation exists is w
 
 ## 1. Orthologic: the comparison algorithm
 
-The active [Orthologic package](Orthologic/REORGANIZATION_PLAN.md) implements
+The active [Orthologic package](Orthologic/README.md) implements
 αβη canonicalization followed by extended OL normalization and comparison.
 Its soundness target is `Ordered AlphaBetaEta`, using actual inference rules.
 The proof-system interfaces below do not depend on the algorithm or an algebra.
@@ -232,7 +232,7 @@ comparison relation. `AlphaBetaEta` is symmetric, so a comparison step identifie
 the two encoded sequent formulas up to conversion.
 
 The file supplies the preorder and equality/implication congruence instances.
-The relation is defined independently of normalization; the Lambda package
+The relation is defined independently of normalization; the AlphaBetaEtaNormalization package
 decides it on well-sorted expressions.
 
 This baseline replaces the former Standard calculus, which had no conversion
@@ -384,9 +384,9 @@ There is no transfer of negative answers. A source algorithm may miss a comparis
 
 This is the interface needed to justify a limited executable comparison against a stronger reference relation without requiring the executable relation itself to satisfy every law of `ProofOrder`.
 
-## How the pieces fit after Lambda
+## How the pieces fit after AlphaBetaEtaNormalization
 
-Lambda normalization handles αβη conversion. `Orthologic.Expression` lowers
+AlphaBetaEtaNormalization normalization handles αβη conversion. `Orthologic.Expression` lowers
 those canonical terms into the OL syntax, normalizes recursively, then compares
 the results. `Orthologic.Cached` implements exactly the same operations with
 verified memoization. Soundness is proved directly in Ordered αβη.
@@ -403,7 +403,7 @@ Read:
 
 1. [Imported.lean](Imported.lean)
 2. [ImportedWeakened.lean](ImportedWeakened.lean)
-3. The [Orthologic pipeline and soundness proofs](Orthologic/REORGANIZATION_PLAN.md)
+3. The [Orthologic pipeline and soundness proofs](Orthologic/README.md)
 4. [Checker/ProofRelation.lean](Checker/ProofRelation.lean)
 5. [Checker/Encoding.lean](Checker/Encoding.lean)
 6. [Checker/Interfaces.lean](Checker/Interfaces.lean)
