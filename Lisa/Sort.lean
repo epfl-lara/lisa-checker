@@ -33,25 +33,25 @@ namespace LSort
 def isFunctional : LSort -> Bool
   | ind => true
   | prop => false
-  | arrow ind s => isFunctional s
+  | arrow ind s => s.isFunctional
   | arrow _ _ => false
 
 def isPredicate : LSort -> Bool
   | ind => false
   | prop => true
-  | arrow ind s => isPredicate s
+  | arrow ind s => s.isPredicate
   | arrow _ _ => false
 
 def depth : LSort -> Nat
   | ind => 0
   | prop => 0
-  | arrow _ s => depth s + 1
+  | arrow _ s => s.depth + 1
 
 def splitArgs : LSort -> (List LSort × LSort)
   | ind => ([], ind)
   | prop => ([], prop)
   | arrow arg res =>
-      match splitArgs res with
+      match res.splitArgs with
       | (args, final) => (arg :: args, final)
 
 end LSort

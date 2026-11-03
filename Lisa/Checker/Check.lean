@@ -150,9 +150,9 @@ def checkStep (imports checked : Array (Checked leq)) (step : Step) :
           · intro s hs
             obtain ⟨t, ht, rfl⟩ := Finset.mem_image.mp hs
             rcases Finset.mem_union.mp ht with ht | ht
-            · exact assumptionsWellSorted (Classical.choice p0.certificate) _
+            · exact (Classical.choice p0.certificate).assumptionsWellSorted _
                 (Finset.mem_image.mpr ⟨t, (Finset.mem_filter.mp ht).1, rfl⟩)
-            · exact assumptionsWellSorted (Classical.choice p1.certificate) _
+            · exact (Classical.choice p1.certificate).assumptionsWellSorted _
                 (Finset.mem_image.mpr ⟨t, ht, rfl⟩)⟩
       else throw .invalidConditions
     | .restate premise0 => do
@@ -580,10 +580,10 @@ def checkStep (imports checked : Array (Checked leq)) (step : Step) :
       else throw .invalidConditions
     | .instSchema premise0 σ => do
       let p0 ← lookup imports checked premise0
-      let condition := verify ((Subst.wellSorted σ) ∧
+      let condition := verify (σ.wellSorted ∧
           ((
-        let Γ₁' := p0.statement.sequent.1.image (Subst.subst σ)
-        let Γ₂' := p0.statement.sequent.2.image (Subst.subst σ)
+        let Γ₁' := p0.statement.sequent.1.image σ.subst
+        let Γ₂' := p0.statement.sequent.2.image σ.subst
 
         setLeq leq Γ₁' Ω₁ ∧ setLeq leq Γ₂' Ω₂
       )))

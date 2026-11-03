@@ -370,8 +370,8 @@ inductive ProofTree (leq : ExprRel) : (Γ Δ : Finset Expr) -> Type where
   | instSchema {Γ Δ : Finset Expr} (σ : Subst) :
       isFSet Γ ->
       isFSet Δ ->
-      Subst.wellSorted σ ->
+      σ.wellSorted ->
       ProofTree leq Γ Δ ->
-      ProofTree leq (Γ.image (subst σ)) (Δ.image (subst σ))
+      ProofTree leq (Γ.image σ.subst) (Δ.image σ.subst)
 
 end Ordered

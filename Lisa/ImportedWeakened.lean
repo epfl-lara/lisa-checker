@@ -11,11 +11,11 @@ section Translation
 
 
 /-- Recover the sorting evidence carried by the conclusion of a derivation. -/
-theorem wellSorted {Γ Δ ss} (tree : ProofTree leq Γ Δ ss) : isFSet Γ ∧ isFSet Δ := by
+theorem ProofTree.wellSorted {Γ Δ ss} (tree : ProofTree leq Γ Δ ss) : isFSet Γ ∧ isFSet Δ := by
   induction tree <;> simp_all [isFSet, Expr.bot]
 
 /-- Every recorded assumption is a well-sorted sequent. -/
-theorem assumptionsWellSorted {Γ Δ ss} (tree : ProofTree leq Γ Δ ss) :
+theorem ProofTree.assumptionsWellSorted {Γ Δ ss} (tree : ProofTree leq Γ Δ ss) :
     ∀ s ∈ ss, isFSet s.1 ∧ isFSet s.2 := by
   classical
   induction tree with
@@ -60,27 +60,27 @@ noncomputable def resolveWith {target : ExprRel}
     classical
     by_cases heq : sameSequent leq s (α, β)
     · have hq := ihq (fun t ht => imports t (Finset.mem_union_right _ ht))
-      obtain ⟨hα, hβ⟩ := wellSorted q
+      obtain ⟨hα, hβ⟩ := q.wellSorted
       -- Sorting of a discharged assumption is supplied at its assumed leaf.
-      have hsSort := assumptionsWellSorted p s hs
+      have hsSort := p.assumptionsWellSorted s hs
       exact .restate hα hβ hsSort.1 hsSort.2 hq (sim.sequent heq.2) (sim.sequent heq.1)
     · exact imports s (Finset.mem_union_left _ (Finset.mem_filter.mpr ⟨hs, heq⟩))
   | weakening h2 h3 p0 h5 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .weakening h0 h1 h2 h3 (ih0 imports) (sim.sequent h5)
   | restateTrue h0 h1 h2 =>
     exact .restateTrue h0 h1 (sim.same h2)
   | hypothesis α h0 h1 h2 h3 h4 =>
     exact .hypothesis α h0 h1 h2 (sim.member h3) (sim.member h4)
   | cut α p0 p1 h6 h7 h8 h9 h10 h11 h12 ih0 ih1 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
-    obtain ⟨h3, h4⟩ := wellSorted p1
+    obtain ⟨h0, h1⟩ := p0.wellSorted
+    obtain ⟨h3, h4⟩ := p1.wellSorted
     exact .cut α h0 h1
       (ih0 (fun s hs => imports s (Finset.mem_union_left _ hs))) h3 h4
       (ih1 (fun s hs => imports s (Finset.mem_union_right _ hs))) h6 h7
       h8 (sim.members h9) (sim.members h10) (sim.except h11) (sim.except h12)
   | leftAnd α β p0 h3 h4 h5 h6 h7 h8 h9 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftAnd α β h0 h1 (ih0 imports) h3 h4 h5 h6
       (sim.members h7) (sim.exceptEither h8) (sim.member h9)
 
@@ -92,7 +92,7 @@ noncomputable def resolveWith {target : ExprRel}
     · exact hΩ₂
     · intro prem hp
       obtain ⟨p, hp', rfl⟩ := List.mem_map.mp hp
-      exact ⟨(wellSorted (trees p hp')).1, (wellSorted (trees p hp')).2, hsort p hp'⟩
+      exact ⟨(trees p hp').wellSorted.1, (trees p hp').wellSorted.2, hsort p hp'⟩
     · refine mapFamily forget (P := fun p => Weakened.ProofTree target p.pre p.post) ?_
       intro p hp
       exact ih p hp (fun s hs =>
@@ -102,25 +102,25 @@ noncomputable def resolveWith {target : ExprRel}
       exact ⟨sim.members (hcontext p hp').1, sim.except (hcontext p hp').2⟩
     · simpa [forget, List.map_map] using sim.member hprincipal
   | leftImp α β p0 p1 h6 h7 h8 h9 h10 h11 h12 h13 h14 ih0 ih1 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
-    obtain ⟨h3, h4⟩ := wellSorted p1
+    obtain ⟨h0, h1⟩ := p0.wellSorted
+    obtain ⟨h3, h4⟩ := p1.wellSorted
     exact .leftImp α β h0 h1
       (ih0 (fun s hs => imports s (Finset.mem_union_left _ hs))) h3 h4
       (ih1 (fun s hs => imports s (Finset.mem_union_right _ hs))) h6 h7
       h8 h9 (sim.members h10) (sim.members h11) (sim.except h12) (sim.except h13) (sim.member h14)
   | leftIff α β p0 h3 h4 h5 h6 h7 h8 h9 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftIff α β h0 h1 (ih0 imports) h3 h4 h5 h6
       (sim.members h7) (sim.exceptEither h8) (sim.member h9)
   | leftNot α p0 h3 h4 h5 h6 h7 h8 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftNot α h0 h1 (ih0 imports) h3 h4 h5 (sim.members h6) (sim.except h7) (sim.member h8)
   | leftForall x α t p0 h3 h4 h5 h6 h7 h8 h9 h10 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftForall x α t h0 h1 (ih0 imports) h3 h4 h5 h6 h7
       (sim.members h8) (sim.except h9) (sim.member h10)
   | leftExists x α p0 h3 h4 h5 h6 h7 h8 h9 h10 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftExists x α h0 h1 (ih0 imports) h3 h4 h5 h6
       (sim.members h7) (sim.except h8) (sim.member h9) h10
 
@@ -132,7 +132,7 @@ noncomputable def resolveWith {target : ExprRel}
     · exact hΩ₂
     · intro prem hp
       obtain ⟨p, hp', rfl⟩ := List.mem_map.mp hp
-      exact ⟨(wellSorted (trees p hp')).1, (wellSorted (trees p hp')).2, hsort p hp'⟩
+      exact ⟨(trees p hp').wellSorted.1, (trees p hp').wellSorted.2, hsort p hp'⟩
     · refine mapFamily forget (P := fun p => Weakened.ProofTree target p.pre p.post) ?_
       intro p hp
       exact ih p hp (fun s hs =>
@@ -142,42 +142,42 @@ noncomputable def resolveWith {target : ExprRel}
       exact ⟨sim.members (hcontext p hp').1, sim.except (hcontext p hp').2⟩
     · simpa [forget, List.map_map] using sim.member hprincipal
   | rightOr α β p0 h3 h4 h5 h6 h7 h8 h9 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightOr α β h0 h1 (ih0 imports) h3 h4 h5 h6
       (sim.members h7) (sim.exceptEither h8) (sim.member h9)
   | rightImp α β p0 h3 h4 h5 h6 h7 h8 h9 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightImp α β h0 h1 (ih0 imports) h3 h4 h5 h6 (sim.except h7) (sim.except h8) (sim.member h9)
   | rightIff α β p0 p1 h6 h7 h8 h9 h10 h11 h12 h13 h14 ih0 ih1 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
-    obtain ⟨h3, h4⟩ := wellSorted p1
+    obtain ⟨h0, h1⟩ := p0.wellSorted
+    obtain ⟨h3, h4⟩ := p1.wellSorted
     exact .rightIff α β h0 h1
       (ih0 (fun s hs => imports s (Finset.mem_union_left _ hs))) h3 h4
       (ih1 (fun s hs => imports s (Finset.mem_union_right _ hs))) h6 h7
       h8 h9 (sim.members h10) (sim.members h11) (sim.except h12) (sim.except h13) (sim.member h14)
   | rightNot α p0 h3 h4 h5 h6 h7 h8 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightNot α h0 h1 (ih0 imports) h3 h4 h5 (sim.members h6) (sim.except h7) (sim.member h8)
   | rightForall x α p0 h3 h4 h5 h6 h7 h8 h9 h10 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightForall x α h0 h1 (ih0 imports) h3 h4 h5 h6
       (sim.members h7) (sim.except h8) (sim.member h9) h10
   | rightExists x α t p0 h3 h4 h5 h6 h7 h8 h9 h10 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightExists x α t h0 h1 (ih0 imports) h3 h4 h5 h6 h7
       (sim.members h8) (sim.except h9) (sim.member h10)
   | rightEpsilon x α t p0 h3 h4 h5 h6 h7 h8 h9 h10 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .rightEpsilon x α t h0 h1 (ih0 imports) h3 h4 h5 h6 h7
       (sim.members h8) (sim.except h9) (sim.member h10)
   | leftRefl s t p0 h3 h4 h5 h6 h7 h8 h9 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .leftRefl s t h0 h1 (ih0 imports) h3 h4 h5 h6 (sim.same h7) (sim.members h8) (sim.except h9)
   | rightRefl s t h0 h1 h2 h3 h4 h5 =>
     exact .rightRefl s t h0 h1 h2 h3 (sim.same h4) (sim.member h5)
   | leftSubst r p q hΩ₁ hΩ₂ hv hf hl ha hr hΘ hΞ ihp ihq =>
-    obtain ⟨hΓ₁, hΓ₂⟩ := wellSorted p
-    obtain ⟨hΘsort, hΞsort⟩ := wellSorted q
+    obtain ⟨hΓ₁, hΓ₂⟩ := p.wellSorted
+    obtain ⟨hΘsort, hΞsort⟩ := q.wellSorted
     exact .leftSubst r hΓ₁ hΓ₂
       (ihp (fun s hs => imports s (Finset.mem_union_left _ hs)))
       hΘsort (fun e he => hΞsort e (Finset.mem_insert_of_mem he))
@@ -185,8 +185,8 @@ noncomputable def resolveWith {target : ExprRel}
       hΩ₁ hΩ₂ hv hf (sim.except hl) (sim.member ha) (sim.members hr)
       (sim.members hΘ) (sim.members hΞ)
   | rightSubst r p q hΩ₁ hΩ₂ hv hf hr ha hl hΘ hΞ ihp ihq =>
-    obtain ⟨hΓ₁, hΓ₂⟩ := wellSorted p
-    obtain ⟨hΘsort, hΞsort⟩ := wellSorted q
+    obtain ⟨hΓ₁, hΓ₂⟩ := p.wellSorted
+    obtain ⟨hΘsort, hΞsort⟩ := q.wellSorted
     exact .rightSubst r hΓ₁ hΓ₂
       (ihp (fun s hs => imports s (Finset.mem_union_left _ hs)))
       hΘsort (fun e he => hΞsort e (Finset.mem_insert_of_mem he))
@@ -194,7 +194,7 @@ noncomputable def resolveWith {target : ExprRel}
       hΩ₁ hΩ₂ hv hf (sim.except hr) (sim.member ha) (sim.members hl)
       (sim.members hΘ) (sim.members hΞ)
   | instSchema σ p0 h3 h4 h5 h6 ih0 =>
-    obtain ⟨h0, h1⟩ := wellSorted p0
+    obtain ⟨h0, h1⟩ := p0.wellSorted
     exact .instSchema σ h0 h1 (ih0 imports) h3 h4 h5 ⟨sim.members h6.1, sim.members h6.2⟩
 
 
@@ -339,7 +339,7 @@ noncomputable def ProofTree.weakenAssumptions [Std.Refl leq] {Γ Δ ss tt}
     (hsorted : ∀ s ∈ tt, isFSet s.1 ∧ isFSet s.2) : ProofTree leq Γ Δ tt := by
   classical
   let q := Classical.choice (assumeAll (leq := leq) tt hsorted)
-  have hp := wellSorted p
+  have hp := p.wellSorted
   have result := ProofTree.cut top q p hp.1 hp.2 (by simp [Expr.top])
     (by simp [setLeq]) (setLeq_of_subset (Finset.Subset.refl _))
     (by simp [containedExcept, isSame, OrderLaws.self_le])
@@ -357,7 +357,7 @@ theorem withAssumptions_iff [Std.Refl leq] {Γ Δ ss}
     exact ⟨resolve p (fun s hs => Classical.choice (imports s hs))⟩
   · rintro ⟨p⟩
     obtain ⟨q⟩ := assumeAll (leq := leq) ss (fun s hs =>
-      wellSorted (embed (Classical.choice (imports s hs))))
+      (embed (Classical.choice (imports s hs))).wellSorted)
     have result := ProofTree.discharge (embed p) q
     exact ⟨by simpa [discharged] using result⟩
 

@@ -108,8 +108,8 @@ private theorem not_free_exists_insert_union {x : SVar} {α : Expr}
     {Γ Δ : Finset Expr}
     (hfree : x ∉ freeVars (Γ ∪ Δ)) :
     x ∉ freeVars (insert (exists_ x α) Γ ∪ Δ) := by
-  change x ∉ (insert (exists_ x α) Γ ∪ Δ).biUnion (fun e : Expr => Expr.freeVars e)
-  change x ∉ (Γ ∪ Δ).biUnion (fun e : Expr => Expr.freeVars e) at hfree
+  change x ∉ (insert (exists_ x α) Γ ∪ Δ).biUnion (·.freeVars)
+  change x ∉ (Γ ∪ Δ).biUnion (·.freeVars) at hfree
   simpa [Expr.exists_, Finset.biUnion_insert, Finset.union_assoc,
     Finset.union_left_comm, Finset.union_comm] using hfree
 
@@ -117,8 +117,8 @@ private theorem not_free_forall_insert_union {x : SVar} {α : Expr}
     {Γ Δ : Finset Expr}
     (hfree : x ∉ freeVars (Γ ∪ Δ)) :
     x ∉ freeVars (insert (forall_ x α) Γ ∪ Δ) := by
-  change x ∉ (insert (forall_ x α) Γ ∪ Δ).biUnion (fun e : Expr => Expr.freeVars e)
-  change x ∉ (Γ ∪ Δ).biUnion (fun e : Expr => Expr.freeVars e) at hfree
+  change x ∉ (insert (forall_ x α) Γ ∪ Δ).biUnion (·.freeVars)
+  change x ∉ (Γ ∪ Δ).biUnion (·.freeVars) at hfree
   simpa [Expr.forall_, Finset.biUnion_insert, Finset.union_assoc,
     Finset.union_left_comm, Finset.union_comm] using hfree
 

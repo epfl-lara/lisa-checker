@@ -213,21 +213,20 @@ example : PureFol.Provable ∅ {PureFol.BoundedFormula.top (L := L)} := by
 -- Schematic instantiation can introduce epsilon. Its instantiation node is
 -- eliminated in LambdaFol → WithoutInstantiation before normalization and readback into PureFol.
 private def schema : Subst := (∅ : Subst).insert x (Expr.epsilon_ (.lam y (Expr.eq (.var y) (.var y))))
-private theorem schema_sorted : Subst.wellSorted schema := by
+private theorem schema_sorted : schema.wellSorted := by
   apply Subst.wellSorted_insert
   · unfold Subst.wellSorted
     decide
   · rfl
 private noncomputable def schemaProof : Ordered.AlphaBetaEtaProof ∅
-    (({Expr.eq (.var x) (.var x)} : Finset Expr).image (Expr.subst schema)) := by
+    (({Expr.eq (.var x) (.var x)} : Finset Expr).image schema.subst) := by
   simpa using Ordered.ProofTree.instSchema schema isFSet_empty
     (by unfold isFSet isFormula Expr.hasSort; decide) schema_sorted
     (Ordered.ProofTree.rightRefl (.var x) rfl)
 
 example : PureFol.Provable ∅
-    (FirstOrderAssignment.defaultAssignment.toPureFolFormulaSet (({Expr.eq (.var x) (.var x)} : Finset Expr).image (Expr.subst schema))) := by
+    (FirstOrderAssignment.defaultAssignment.toPureFolFormulaSet (({Expr.eq (.var x) (.var x)} : Finset Expr).image schema.subst)) := by
   simpa only [FirstOrderAssignment.toPureFolFormulaSet_empty] using
     ordered_toPureFol schemaProof isFSet_empty (by unfold isFSet isFormula Expr.hasSort; decide) _ FirstOrderAssignment.defaultAssignment_fixesConstants
 
 end Tests.PureFolEpsilon
-
