@@ -862,7 +862,7 @@ def weakenedToOrdered {leq Γ Δ} [Std.Refl leq] [RelationCongruence leq] :
         (setLeq_empty Ω₁)
         (setLeq_singleton_of_ordContains hadd)
   | .leftSubst (Ω₁ := Ω₁) (Ω₂ := Ω₂) r _ _ p hΘ hΞ q
-      hΩ₁ hΩ₂ hv hf hleft hright hadd hΘsub hΞsub =>
+      hΩ₁ hΩ₂ hv hf hleft hadd hright hΘsub hΞsub =>
       let prem := replaceContexts (isFSet_insert hv.2.2.2.1 hΩ₁) hΩ₂
         (weakenedToOrdered p) (setLeq_to_insert_of_containedExcept hleft) hright
       let result := Ordered.ProofTree.leftSubst r hΩ₁ hΩ₂ hΘ hΞ hv hf
@@ -881,7 +881,7 @@ def weakenedToOrdered {leq Γ Δ} [Std.Refl leq] [RelationCongruence leq] :
           · exact ⟨e, he, isSame_refl e⟩
           · exact hΞsub e he)
   | .rightSubst (Ω₁ := Ω₁) (Ω₂ := Ω₂) r _ _ p hΘ hΞ q
-      hΩ₁ hΩ₂ hv hf hleft hright hadd hΘsub hΞsub =>
+      hΩ₁ hΩ₂ hv hf hright hadd hleft hΘsub hΞsub =>
       let prem := replaceContexts hΩ₁ (isFSet_insert hv.2.2.2.1 hΩ₂)
         (weakenedToOrdered p) hleft (setLeq_to_insert_of_containedExcept hright)
       let result := Ordered.ProofTree.rightSubst r hΩ₁ hΩ₂ hΘ hΞ hv hf

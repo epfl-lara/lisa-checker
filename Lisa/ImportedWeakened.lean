@@ -175,23 +175,23 @@ noncomputable def resolveWith {target : ExprRel}
     exact .leftRefl s t h0 h1 (ih0 imports) h3 h4 h5 h6 (sim.same h7) (sim.members h8) (sim.except h9)
   | rightRefl s t h0 h1 h2 h3 h4 h5 =>
     exact .rightRefl s t h0 h1 h2 h3 (sim.same h4) (sim.member h5)
-  | leftSubst r p q hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ ihp ihq =>
+  | leftSubst r p q hΩ₁ hΩ₂ hv hf hl ha hr hΘ hΞ ihp ihq =>
     obtain ⟨hΓ₁, hΓ₂⟩ := wellSorted p
     obtain ⟨hΘsort, hΞsort⟩ := wellSorted q
     exact .leftSubst r hΓ₁ hΓ₂
       (ihp (fun s hs => imports s (Finset.mem_union_left _ hs)))
       hΘsort (fun e he => hΞsort e (Finset.mem_insert_of_mem he))
       (ihq (fun s hs => imports s (Finset.mem_union_right _ hs)))
-      hΩ₁ hΩ₂ hv hf (sim.except hl) (sim.members hr) (sim.member ha)
+      hΩ₁ hΩ₂ hv hf (sim.except hl) (sim.member ha) (sim.members hr)
       (sim.members hΘ) (sim.members hΞ)
-  | rightSubst r p q hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ ihp ihq =>
+  | rightSubst r p q hΩ₁ hΩ₂ hv hf hr ha hl hΘ hΞ ihp ihq =>
     obtain ⟨hΓ₁, hΓ₂⟩ := wellSorted p
     obtain ⟨hΘsort, hΞsort⟩ := wellSorted q
     exact .rightSubst r hΓ₁ hΓ₂
       (ihp (fun s hs => imports s (Finset.mem_union_left _ hs)))
       hΘsort (fun e he => hΞsort e (Finset.mem_insert_of_mem he))
       (ihq (fun s hs => imports s (Finset.mem_union_right _ hs)))
-      hΩ₁ hΩ₂ hv hf (sim.members hl) (sim.except hr) (sim.member ha)
+      hΩ₁ hΩ₂ hv hf (sim.except hr) (sim.member ha) (sim.members hl)
       (sim.members hΘ) (sim.members hΞ)
   | instSchema σ p0 h3 h4 h5 h6 ih0 =>
     obtain ⟨h0, h1⟩ := wellSorted p0
@@ -291,10 +291,10 @@ noncomputable def embed {Γ Δ} (tree : Weakened.ProofTree leq Γ Δ) :
     simpa using (ProofTree.leftRefl s t ih0 h3 h4 h5 h6 h7 h8 h9)
   | rightRefl s t h0 h1 h2 h3 h4 h5 =>
     simpa using (ProofTree.rightRefl s t h0 h1 h2 h3 h4 h5)
-  | leftSubst r _ _ _ _ _ _ hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ ihp ihq =>
-    simpa using ProofTree.leftSubst r ihp ihq hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ
-  | rightSubst r _ _ _ _ _ _ hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ ihp ihq =>
-    simpa using ProofTree.rightSubst r ihp ihq hΩ₁ hΩ₂ hv hf hl hr ha hΘ hΞ
+  | leftSubst r _ _ _ _ _ _ hΩ₁ hΩ₂ hv hf hl ha hr hΘ hΞ ihp ihq =>
+    simpa using ProofTree.leftSubst r ihp ihq hΩ₁ hΩ₂ hv hf hl ha hr hΘ hΞ
+  | rightSubst r _ _ _ _ _ _ hΩ₁ hΩ₂ hv hf hr ha hl hΘ hΞ ihp ihq =>
+    simpa using ProofTree.rightSubst r ihp ihq hΩ₁ hΩ₂ hv hf hr ha hl hΘ hΞ
   | instSchema σ h0 h1 p0 h3 h4 h5 h6 ih0 =>
     simpa using (ProofTree.instSchema σ ih0 h3 h4 h5 h6)
 

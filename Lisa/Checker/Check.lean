@@ -555,7 +555,7 @@ def checkStep (imports checked : Array (Checked leq)) (step : Step) :
               (p1.assumptions.image Statement.sequent) := by
             simpa only [Ξ, Finset.insert_erase he] using Classical.choice p1.certificate
           exact ⟨.leftSubst r (Classical.choice p0.certificate) comparisonTree
-            hsort.1 hsort.2 hv hf hl hr ha hΘ hΞ⟩⟩
+            hsort.1 hsort.2 hv hf hl ha hr hΘ hΞ⟩⟩
       else throw .invalidConditions
     | .rightSubst premise comparison r => do
       let p0 ← lookup imports checked premise
@@ -576,7 +576,7 @@ def checkStep (imports checked : Array (Checked leq)) (step : Step) :
               (p1.assumptions.image Statement.sequent) := by
             simpa only [Ξ, Finset.insert_erase he] using Classical.choice p1.certificate
           exact ⟨.rightSubst r (Classical.choice p0.certificate) comparisonTree
-            hsort.1 hsort.2 hv hf hl hr ha hΘ hΞ⟩⟩
+            hsort.1 hsort.2 hv hf hr ha hl hΘ hΞ⟩⟩
       else throw .invalidConditions
     | .instSchema premise0 σ => do
       let p0 ← lookup imports checked premise0
