@@ -1,12 +1,12 @@
 # lisa-checker
 
-An experimental WIP implementation of a proof checker for Lisa's core λFOL logic.
+An implementation of a proof checker for Lisa's core λFOL logic.
 
 The executable checker uses αβη canonicalization followed by extended orthologic
 normalization and comparison, with verified memoization and soundness in
 `Ordered AlphaBetaEta`.
 
-```text
+```console
 lake build Lisa lisa-checker Tests
 lake exe lisa-checker [--limit N] [--closed] [--trace] PREFIX|DIRECTORY ...
 ```
@@ -36,6 +36,3 @@ and the final `Statements`. Supporting proofs live in `FromOrdered`,
 `EliminateInstantiation`, and `ToPureFol`. PureFol uses the same free identifiers
 as Lisa and retains epsilon; assumptions are sequent antecedents. The proof translations are syntactic.
 
-Earlier approaches remain outside the active build in
-[Archive/SCLambdaMathlib](Archive/SCLambdaMathlib) and
-[Archive/SCLambdaCompleteness](Archive/SCLambdaCompleteness/README.md).
