@@ -49,7 +49,7 @@ private def duplicates : Subst := .cons x (.var y) (.cons x (.var xInd) .nil)
 #guard duplicates.find? x = some (.var y)
 #guard (duplicates.without x).find? x = none
 #guard (duplicates.insert x (.var x)).find? x = some (.var x)
-#guard (Subst.subst duplicates (.lam x (.var x))).sort = some (prop >> prop)
+#guard (duplicates.subst (.lam x (.var x))).sort = some (prop >> prop)
 
 /-- Check named substitution against typed instantiation across a mixed syntax corpus. -/
 private def singleCheck (x : SVar) (body arg : Expr) : Bool :=

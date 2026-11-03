@@ -34,14 +34,14 @@ def sort : Expr -> Option LSort
   | .var x => some x.sort
   | .const c => some c.sort
   | .app f a =>
-      match sort f with
+      match f.sort with
       | some (.arrow argSort resSort) =>
-          match sort a with
+          match a.sort with
           | some aSort => if aSort = argSort then some resSort else none
           | none => none
       | _ => none
   | .lam x body =>
-      match sort body with
+      match body.sort with
       | some bodySort => some (x.sort >> bodySort)
       | none => none
 
@@ -117,7 +117,7 @@ def subst (σ : Subst) : Expr -> Expr
       | some e => e
       | none => .var x
   | .const c => .const c
-  | .app f a => .app (subst σ f) (subst σ a)
+  | .app f a => .app (σ.subst f) (σ.subst a)
   | .lam x body =>
       let fv := σ.rangeFreeVars
       let remaining := σ.without x
@@ -126,11 +126,11 @@ def subst (σ : Subst) : Expr -> Expr
         let x' := { x with id := freshId (taken.image (·.id)) x.id }
         .lam x' (subst (remaining.insert x (.var x')) body)
       else
-        .lam x (subst remaining body)
+        .lam x (remaining.subst body)
 
 @[simp]
 theorem wellSorted_replace {σ : Subst} {x : SVar} {e : Expr}
-    (hσ : wellSorted σ) (he : e.hasSort x.sort) :
+    (hσ : σ.wellSorted) (he : e.hasSort x.sort) :
     wellSorted (σ.replace x e) := by
   induction σ with
   | nil =>
@@ -148,7 +148,7 @@ theorem wellSorted_replace {σ : Subst} {x : SVar} {e : Expr}
 
 @[simp]
 theorem wellSorted_insert {σ : Subst} {x : SVar} {e : Expr}
-    (hσ : wellSorted σ) (he : e.hasSort x.sort) :
+    (hσ : σ.wellSorted) (he : e.hasSort x.sort) :
     wellSorted (σ.insert x e) := by
   unfold Lean.AssocList.insert
   by_cases hcontains : Lean.AssocList.contains x σ = true
@@ -157,8 +157,8 @@ theorem wellSorted_insert {σ : Subst} {x : SVar} {e : Expr}
     exact he
 
 @[simp]
-theorem wellSorted_without {σ : Subst} (hσ : wellSorted σ) (x : SVar) :
-    wellSorted (σ.without x) := by
+theorem wellSorted_without {σ : Subst} (hσ : σ.wellSorted) (x : SVar) :
+    (σ.without x).wellSorted := by
   induction σ with
   | nil => trivial
   | cons y e rest ih =>
@@ -168,8 +168,8 @@ theorem wellSorted_without {σ : Subst} (hσ : wellSorted σ) (x : SVar) :
       split <;> simp [*]
       assumption
 
-theorem subst_preserves_sort {σ : Subst} (hσ : wellSorted σ) :
-    ∀ e, (subst σ e).sort = e.sort := by
+theorem subst_preserves_sort {σ : Subst} (hσ : σ.wellSorted) :
+    ∀ e, (σ.subst e).sort = e.sort := by
   intro e
   induction e generalizing σ with
   | var x =>
@@ -207,9 +207,9 @@ theorem subst_preserves_sort {σ : Subst} (hσ : wellSorted σ) :
       · simp only [Expr.sort]
         rw [ih (wellSorted_without hσ x)]
 
-theorem subst_preserves_hasSort {σ : Subst} (hσ : wellSorted σ)
+theorem subst_preserves_hasSort {σ : Subst} (hσ : σ.wellSorted)
     {e : Expr} {s : LSort} (h : e.hasSort s) :
-    (subst σ e).hasSort s := by
+    (σ.subst e).hasSort s := by
   simp [Expr.hasSort, subst_preserves_sort, *]
   assumption
 
@@ -263,7 +263,7 @@ def subst (σ : Subst) (φ : Expr) : Expr :=
   σ.subst φ
 
 def substOne (x : SVar) (t : Expr) (φ : Expr) : Expr :=
-  subst ((∅: Subst).insert x t) φ
+  subst ((∅ : Subst).insert x t) φ
 
 end Expr
 
