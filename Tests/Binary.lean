@@ -1,6 +1,4 @@
-import Lisa.Binary
-import Tests.CheckerModel
-import Lisa.Combined
+import Lisa.Checker.Binary
 
 open Lisa Expr Imported.Checker Imported.Binary
 
@@ -31,34 +29,15 @@ private def reader (bytes : List UInt8) (chunkSize : Nat := 65536) : IO Reader :
     position.set stop
     return data.extract start stop
 
-private def runWith {leq : Order} [CheckerOrder leq]
+private def run
     (treeBytes proofBytes : List UInt8) (chunkSize : Nat := 65536) :
-    IO (Except DecodeError (Array (NamedProof leq))) := do
+    IO (Except DecodeError (Array (NamedProof ProofRelation))) := do
   let treeReader ← reader treeBytes chunkSize
   match ← (readTrees.run treeReader).run with
   | .error e => return .error e
   | .ok table =>
     let proofReader ← reader proofBytes chunkSize
-    (readBundle (leq := leq) table |>.run proofReader).run
-
-private def run (treeBytes proofBytes : List UInt8) (chunkSize : Nat := 65536) :
-    IO (Except DecodeError (Array (NamedProof CheckerModel.leq))) :=
-  runWith treeBytes proofBytes chunkSize
-
--- Exercise paged decoding with the certified combined backend, not only a Boolean model.
-#eval show IO Unit from do
-  for chunkSize in [1, 2, 7, 65536] do
-    match ← runWith (leq := Lisa.Combined.leq 2) trees proof chunkSize with
-    | .error e => throw (IO.userError s!"combined binary fixture: {repr e}")
-    | .ok results =>
-      unless results.size = 1 do throw (IO.userError "wrong combined bundle size")
-      let some result := results[0]? | throw (IO.userError "empty combined bundle")
-      unless result.checked.assumptions = ∅ do
-        throw (IO.userError "combined fixture retained assumptions")
-  for n in [:proof.length] do
-    match ← runWith (leq := Lisa.Combined.leq 2) trees (proof.take n) 7 with
-    | .error _ => pure ()
-    | .ok _ => throw (IO.userError s!"combined backend accepted truncation {n}")
+    (readBundle table |>.run proofReader).run
 
 private def rejected (name : String) (treeBytes proofBytes : List UInt8) : IO Unit := do
   match ← run treeBytes proofBytes with
@@ -97,7 +76,7 @@ private def rejected (name : String) (treeBytes proofBytes : List UInt8) : IO Un
     (header 1 ++ [0] ++ seq [0] [0] ++ be 4 4294967295)
   rejected "mismatched n-ary lengths" trees
     (header 1 ++ [5] ++ seq [0] [0] ++ be 2 1 ++ be 4 0 ++ be 2 0)
-  for tag in [11, 21, 27, 28, 29, 32, 255] do
+  for tag in [11, 21, 24, 25, 27, 28, 29, 32, 255] do
     rejected s!"unsupported tag {tag}" trees (header 1 ++ [UInt8.ofNat tag] ++ seq [] [])
   -- Modified UTF-8 encodes NUL as C0 80 and supplementary scalars as two surrogates.
   let name := [0xC0, 0x80, 0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]
@@ -117,34 +96,34 @@ private def rejected (name : String) (treeBytes proofBytes : List UInt8) : IO Un
 #print axioms Imported.Binary.readProof
 #print axioms Imported.Binary.readBundle
 
-private def ruleTag : Rule → Nat
-  | .assume => 30
-  | .discharge .. => 31
-  | .restate .. => 0
-  | .weakening .. => 20
-  | .restateTrue => 1
-  | .hypothesis .. => 2
-  | .cut .. => 3
-  | .leftAnd .. => 4
-  | .leftOr .. => 5
-  | .leftImp .. => 6
-  | .leftIff .. => 7
-  | .leftNot .. => 8
-  | .leftForall .. => 9
-  | .leftExists .. => 10
-  | .rightAnd .. => 12
-  | .rightOr .. => 13
-  | .rightImp .. => 14
-  | .rightIff .. => 15
-  | .rightNot .. => 16
-  | .rightForall .. => 17
-  | .rightExists .. => 18
-  | .rightEpsilon .. => 19
-  | .leftRefl .. => 22
-  | .rightRefl .. => 23
-  | .leftSubstEq .. => 24
-  | .rightSubstEq .. => 25
-  | .instSchema .. => 26
+private def ruleTag : Rule → Option Nat
+  | .assume => some 30
+  | .discharge .. => some 31
+  | .restate .. => some 0
+  | .weakening .. => some 20
+  | .restateTrue => some 1
+  | .hypothesis .. => some 2
+  | .cut .. => some 3
+  | .leftAnd .. => some 4
+  | .leftOr .. => some 5
+  | .leftImp .. => some 6
+  | .leftIff .. => some 7
+  | .leftNot .. => some 8
+  | .leftForall .. => some 9
+  | .leftExists .. => some 10
+  | .rightAnd .. => some 12
+  | .rightOr .. => some 13
+  | .rightImp .. => some 14
+  | .rightIff .. => some 15
+  | .rightNot .. => some 16
+  | .rightForall .. => some 17
+  | .rightExists .. => some 18
+  | .rightEpsilon .. => some 19
+  | .leftRefl .. => some 22
+  | .rightRefl .. => some 23
+  | .instSchema .. => some 26
+  | .leftSubst .. => some 33
+  | .rightSubst .. => some 34
 
 -- Decode each payload layout followed by a sentinel, detecting under/over-consumption.
 #eval show IO Unit from do
@@ -158,8 +137,8 @@ private def ruleTag : Rule → Nat
     | throw (IO.userError "opcode fixture tree rejected")
   let refs (xs : List Nat) := xs.flatMap (be 4)
   let nary := be 2 1 ++ be 4 0 ++ be 2 1 ++ be 4 0
-  let subst := be 4 0 ++ be 2 1 ++ be 4 7 ++ be 4 7 ++
-    be 2 1 ++ be 4 4 ++ be 4 0
+  let subst := refs [0, 1] ++ be 2 1 ++ refs [7, 7] ++ be 2 0 ++
+    be 2 1 ++ refs [4, 9]
   let payloads : List (Nat × List UInt8) := [
     (0, refs [0]), (1, []), (2, refs [0]), (3, refs [0, 1, 0]),
     (4, refs [0, 0, 3]), (5, nary), (6, refs [0, 1, 0, 3]),
@@ -168,8 +147,8 @@ private def ruleTag : Rule → Nat
     (14, refs [0, 0, 3]), (15, refs [0, 1, 0, 3]), (16, refs [0, 0]),
     (17, refs [0, 0, 4]), (18, refs [0, 0, 4, 7]), (19, refs [0, 0, 4, 7]),
     (20, refs [0]), (22, refs [0, 9]), (23, refs [9]),
-    (24, subst), (25, subst), (26, be 4 0 ++ be 2 1 ++ refs [5, 0]),
-    (30, []), (31, refs [0, 1])]
+    (26, be 4 0 ++ be 2 1 ++ refs [5, 0]),
+    (30, []), (31, refs [0, 1]), (33, subst), (34, subst)]
   for (tag, payload) in payloads do
     let bytes := [UInt8.ofNat tag] ++ seq [0] [0] ++ payload ++
       [2] ++ seq [0] [0] ++ be 4 0
@@ -181,5 +160,75 @@ private def ruleTag : Rule → Nat
     match ← (action.run input).run with
     | .error e => throw (IO.userError s!"opcode {tag}: {repr e}")
     | .ok (first, second) =>
-      unless first = tag && second = 2 do
+      unless first = some tag && second = some 2 do
         throw (IO.userError s!"wrong opcode layout {tag}")
+
+-- Fixed substitution payloads check the complete field order independently of
+-- the fixture writer, and reject every truncated prefix or invalid tree reference.
+#eval show IO Unit from do
+  let x : SVar := ⟨⟨"x", 0⟩, ind⟩
+  let y : SVar := ⟨⟨"y", 0⟩, ind⟩
+  let p : SVar := ⟨⟨"p", 0⟩, prop⟩
+  let f : SVar := ⟨⟨"f", 0⟩, ind >> ind⟩
+  let q : SVar := ⟨⟨"q", 0⟩, prop⟩
+  let body := and (eq (.app (.var f) (.var x)) (.var x)) (.var q)
+  let table := #[Expr.var x, .var y, .var p, top, .var f,
+    .lam x (.var x), .lam y (.var y), .var q, body]
+  -- Two pairs: function equality with one argument, then propositional
+  -- equivalence with no arguments. The premise references are signed.
+  let payload := be 4 4294967295 ++ be 4 7 ++ be 2 2 ++
+    be 4 5 ++ be 4 6 ++ be 2 1 ++ be 4 1 ++
+    be 4 2 ++ be 4 3 ++ be 2 0 ++ be 2 2 ++ be 4 4 ++ be 4 7 ++ be 4 8
+  let snapshot (r : SubstRule) :=
+    (r.comparisons.map (fun (pair, xs) => (pair.source, pair.target, xs)),
+      r.context.params, r.context.body)
+  let expected : SubstRule :=
+    ⟨[(⟨.lam x (.var x), .lam y (.var y)⟩, [y]), (⟨.var p, top⟩, [])], ⟨[f, q], body⟩⟩
+  for tag in [33, 34] do
+    let bytes := [UInt8.ofNat tag] ++ seq [3] [2] ++ payload
+    let input ← reader bytes 1
+    match ← (readStep table |>.run input).run with
+    | .error e => throw (IO.userError s!"substitution layout: {repr e}")
+    | .ok step =>
+      unless step.statement = ⟨[top], [.var p]⟩ do
+        throw (IO.userError "substitution conclusion decoded incorrectly")
+      let checkFields (i j : Int) (r : SubstRule) :=
+        i = -1 && j = 7 && snapshot r = snapshot expected
+      let correct := match step.rule with
+        | .leftSubst i j r => tag = 33 && checkFields i j r
+        | .rightSubst i j r => tag = 34 && checkFields i j r
+        | _ => false
+      unless correct do throw (IO.userError "substitution fields decoded incorrectly")
+    for n in [:bytes.length] do
+      let input ← reader (bytes.take n) 1
+      match ← (readStep table |>.run input).run with
+      | .error _ => pure ()
+      | .ok _ => throw (IO.userError s!"accepted truncated substitution {tag}/{n}")
+    let rejectPayload (payload : List UInt8) (message : String) := do
+      let input ← reader ([UInt8.ofNat tag] ++ seq [] [] ++ payload) 1
+      match ← (readStep table |>.run input).run with
+      | .error e => unless e.message = message do
+          throw (IO.userError s!"wrong substitution decoding error: {repr e}")
+      | .ok _ => throw (IO.userError "accepted malformed substitution payload")
+    let preamble := be 4 0 ++ be 4 1
+    rejectPayload (preamble ++ be 2 65535) "Negative short count"
+    rejectPayload (preamble ++ be 2 1 ++ be 4 4294967295) "Negative expression reference"
+    rejectPayload (preamble ++ be 2 1 ++ be 4 99) "Invalid expression reference 99"
+    let pair := preamble ++ be 2 1 ++ be 4 5 ++ be 4 6
+    rejectPayload (pair ++ be 2 65535) "Negative short count"
+    rejectPayload (pair ++ be 2 1 ++ be 4 3) "Expected readVariable tree"
+    rejectPayload (pair ++ be 2 1 ++ be 4 99) "Invalid expression reference 99"
+    rejectPayload (preamble ++ be 2 0 ++ be 2 65535) "Negative short count"
+    rejectPayload (preamble ++ be 2 0 ++ be 2 1 ++ be 4 3) "Expected readVariable tree"
+    rejectPayload (preamble ++ be 2 0 ++ be 2 0 ++ be 4 99) "Invalid expression reference 99"
+
+-- Retired substitution opcodes fail immediately with a specific diagnostic,
+-- even before attempting to read the old payload.
+#eval show IO Unit from do
+  for tag in [24, 25] do
+    let input ← reader [UInt8.ofNat tag] 1
+    match ← (readStep #[] |>.run input).run with
+    | .error e =>
+        unless e.offset = 1 && e.message.startsWith s!"Unsupported legacy substitution tag {tag};" do
+          throw (IO.userError s!"wrong retired-opcode diagnostic: {repr e}")
+    | .ok _ => throw (IO.userError s!"accepted retired substitution tag {tag}")

@@ -25,47 +25,65 @@ private def reader (data : ByteArray) (page : Nat) : IO Reader := do
     position.set stop
     return data.extract start stop
 
-private def checkData {leq : Order} [CheckerOrder leq]
-    (page : Nat) (treeData proof : ByteArray) (matching : Imported.Checker.Matching leq := .exact leq) :
-    IO (Except DecodeError (Array (NamedProof leq))) := do
+private def checkData (page : Nat) (treeData proof : ByteArray) :
+    IO (Except DecodeError (Array (NamedProof Imported.Checker.ProofRelation))) := do
   let trees ← reader treeData page
   let .ok table ← (readTrees.run trees).run
     | throw (IO.userError "Original tree fixture failed")
   let stream ← reader proof page
-  (readBundle (leq := leq) table false matching |>.run stream).run
+  (readBundle table |>.run stream).run
 
 private def check (page : Nat) (proof : ByteArray) :=
-  checkData (leq := Lisa.Combined.Replay.leq 8) page (decodeHex treeHex) proof
-    (Lisa.Combined.Replay.matching 8)
+  checkData page (decodeHex treeHex) proof
 
--- Preserve the original failure boundary, then certify the repaired prefix with paged reads.
+-- This unchanged Scala export uses the retired one-premise substitution tag 25.
+-- The checker reports that format boundary, including with paged reads.
 #eval show IO Unit from do
   let load (path : System.FilePath) := do
     let text ← IO.FS.readFile path
     return decodeHex (text.replace "\n" "" |>.replace "\r" "")
   let trees ← load "Tests/Fixtures/MGT024.trees.hex"
   let proof ← load "Tests/Fixtures/MGT024.proof.hex"
-  match ← checkData (leq := Lisa.Combined.leq 8) 7 trees proof with
-  | .error e =>
-      unless e.offset = 824 && e.message.startsWith "Invalid step 39 (weakening):" do
-        throw (IO.userError s!"Original Weakening boundary changed: {repr e}")
-  | .ok _ => throw (IO.userError "Contextual baseline unexpectedly accepted quantified Weakening")
-  for (page, optimized) in [(1, false), (7, false), (65536, false), (1, true), (7, true), (65536, true)] do
-    let matching := if optimized then Lisa.Combined.Replay.matching 8 else .exact (Lisa.Combined.Replay.leq 8)
-    match ← checkData (leq := Lisa.Combined.Replay.leq 8) page trees proof matching with
-    | .error e => throw (IO.userError s!"Quantified Weakening fixture failed: {repr e}")
+  let expectRetired {α : Type} (result : Except DecodeError α) : IO Unit := do
+    match result with
+    | .error e =>
+        unless e.offset = 680 && e.message.startsWith "Unsupported legacy substitution tag 25;" do
+          throw (IO.userError s!"Legacy substitution boundary changed: {repr e}")
+    | .ok _ => throw (IO.userError "Accepted retired substitution instruction in Scala export")
+  for page in [1, 7, 65536] do
+    expectRetired (← checkData page trees proof)
+
+-- The migrated copy supplies the pointwise comparison by hypothesis and
+-- leftForall before applying the new two-premise rightSubst instruction.
+-- Every original conclusion is retained, including the quantified weakening.
+#eval show IO Unit from do
+  let load (path : System.FilePath) := do
+    return decodeHex ((← IO.FS.readFile path).replace "\n" "" |>.replace "\r" "")
+  let trees ← load "Tests/Fixtures/MGT024-two-premise.trees.hex"
+  let proof ← load "Tests/Fixtures/MGT024-two-premise.proof.hex"
+  let treeReader ← reader trees 7
+  let .ok table ← (readTrees.run treeReader).run
+    | throw (IO.userError "Migrated tree fixture failed")
+  for page in [1, 7, 65536] do
+    match ← checkData page trees proof with
+    | .error e => throw (IO.userError s!"Migrated substitution proof failed: {repr e}")
     | .ok results =>
-        let some (result : NamedProof (Lisa.Combined.Replay.leq 8)) := results[0]?
-          | throw (IO.userError "Missing quantified theorem")
-        unless results.size = 1 && result.name = "theBenchmark.p" &&
-            result.steps = 40 && result.imports = 7 do
-          throw (IO.userError "Quantified fixture metadata changed")
-        if h : result.checked.assumptions = ∅ then
-          let closed : Imported.Checker.ClosedChecked (Lisa.Combined.Replay.leq 8)
-              (result.checked.statement) := ⟨by simpa [h] using result.checked.certificate⟩
-          have _ := Lisa.Combined.certificate_sound closed
-          pure ()
-        else throw (IO.userError "Quantified fixture gained unresolved assumptions")
+      let some result := results[0]? | throw (IO.userError "Missing migrated theorem")
+      unless results.size = 1 && result.name = "theBenchmark.p" &&
+          result.steps = 42 && result.imports = 7 && result.checked.assumptions = ∅ &&
+          result.checked.statement = ⟨[table[148]!, table[154]!], [table[176]!]⟩ do
+        throw (IO.userError "Migrated proof changed its conclusion or dependencies")
+  IO.FS.withTempDir fun directory => do
+    let treePath := directory / "substitution.trees"
+    let proofPath := directory / "substitution.proof"
+    IO.FS.writeBinFile treePath trees
+    IO.FS.writeBinFile proofPath proof
+    match ← checkFiles treePath proofPath with
+    | .error e => throw (IO.userError s!"Migrated proof file checking failed: {repr e}")
+    | .ok results =>
+      let some result := results[0]? | throw (IO.userError "Missing migrated file result")
+      unless results.size = 1 && result.steps = 42 do
+        throw (IO.userError "Wrong migrated file result count")
 
 #eval show IO Unit from do
   for page in [1, 2, 7, 65536] do
@@ -89,7 +107,7 @@ private def check (page : Nat) (proof : ByteArray) :=
   | .error _ => pure ()
   | .ok _ => throw (IO.userError "Accepted trailing bytes in original proof")
 
-#guard (Lisa.CLI.parse ["--budget", "0", "--limit", "2", "--closed", "--trace", "proof"] {}).isOk
+#guard (Lisa.CLI.parse ["--limit", "2", "--closed", "--trace", "proof"] {}).isOk
 #guard !(Lisa.CLI.parse [] {}).isOk
 #guard !(Lisa.CLI.parse ["--limit", "0", "proof"] {}).isOk
 #guard !(Lisa.CLI.parse ["--limit", "-1", "proof"] {}).isOk
@@ -107,7 +125,7 @@ private def check (page : Nat) (proof : ByteArray) :=
   let inputs ← Lisa.CLI.prefixes #[directory, directory, trees, proof, base]
   unless inputs = #[base] do
     throw (IO.userError s!"Duplicate inputs or lost dotted prefix: {repr inputs}")
-  match ← Lisa.Combined.checkFiles 8 trees proof with
+  match ← Imported.Binary.checkFiles trees proof with
   | .error e => throw (IO.userError s!"Paged file checking failed: {repr e}")
   | .ok results =>
     unless results.size = 1 do throw (IO.userError "Wrong file result count")
