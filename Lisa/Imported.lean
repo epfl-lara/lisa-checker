@@ -365,27 +365,47 @@ inductive ProofTree (leq : ExprRel) :
 
   /-- Both premises contribute imported assumptions; freshness concerns Θ and Ξ. -/
   | leftSubst {ss₀ ss₁ : Finset Sequent} {Γ₁ Γ₂ Θ Ξ Ω₁ Ω₂ : Finset Expr} (r : SubstRule) :
-      ProofTree leq Γ₁ Γ₂ ss₀ -> ProofTree leq Θ (insert r.equation Ξ) ss₁ ->
-      isFSet Ω₁ -> isFSet Ω₂ -> r.valid -> r.fresh Θ Ξ ->
-      containedExcept leq Γ₁ Ω₁ r.source -> setLeq leq Γ₂ Ω₂ ->
-      ordContains leq r.target Ω₁ -> setLeq leq Θ Ω₁ -> setLeq leq Ξ Ω₂ ->
+      -- premise we substitute in
+      ProofTree leq Γ₁ Γ₂ ss₀ ->
+      -- proof for the substitution rule
+      ProofTree leq Θ (insert r.equation Ξ) ss₁ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      -- valid substitution rule
+      r.valid -> r.fresh Θ Ξ ->
+      -- only source was removed, target was added
+      containedExcept leq Γ₁ Ω₁ r.source ->
+      ordContains leq r.target Ω₁ ->
+      -- rest is preserved
+      setLeq leq Γ₂ Ω₂ ->
+      setLeq leq Θ Ω₁ -> setLeq leq Ξ Ω₂ ->
       ProofTree leq Ω₁ Ω₂ (ss₀ ∪ ss₁)
 
   | rightSubst {ss₀ ss₁ : Finset Sequent} {Γ₁ Γ₂ Θ Ξ Ω₁ Ω₂ : Finset Expr} (r : SubstRule) :
-      ProofTree leq Γ₁ Γ₂ ss₀ -> ProofTree leq Θ (insert r.equation Ξ) ss₁ ->
-      isFSet Ω₁ -> isFSet Ω₂ -> r.valid -> r.fresh Θ Ξ ->
-      setLeq leq Γ₁ Ω₁ -> containedExcept leq Γ₂ Ω₂ r.source ->
-      ordContains leq r.target Ω₂ -> setLeq leq Θ Ω₁ -> setLeq leq Ξ Ω₂ ->
+      -- premise we substitute in
+      ProofTree leq Γ₁ Γ₂ ss₀ ->
+      -- proof for the substitution rule
+      ProofTree leq Θ (insert r.equation Ξ) ss₁ ->
+      -- conclusion
+      isFSet Ω₁ -> isFSet Ω₂ ->
+      -- valid substitution rule
+      r.valid -> r.fresh Θ Ξ ->
+      -- only source was removed, target was added
+      containedExcept leq Γ₂ Ω₂ r.source ->
+      ordContains leq r.target Ω₂ ->
+      -- rest is preserved
+      setLeq leq Γ₁ Ω₁ ->
+      setLeq leq Θ Ω₁ -> setLeq leq Ξ Ω₂ ->
       ProofTree leq Ω₁ Ω₂ (ss₀ ∪ ss₁)
 
   | instSchema {ss : Finset Sequent} {Γ₁ Γ₂ Ω₁ Ω₂ : Finset Expr} (σ : Subst) :
       ProofTree leq Γ₁ Γ₂ ss ->
       isFSet Ω₁ -> isFSet Ω₂ ->
-      Subst.wellSorted σ ->
+      σ.wellSorted ->
       -- Preserve each instantiated formula on its original side.
       (
-        let Γ₁' := Γ₁.image (Subst.subst σ)
-        let Γ₂' := Γ₂.image (Subst.subst σ)
+        let Γ₁' := Γ₁.image σ.subst
+        let Γ₂' := Γ₂.image σ.subst
 
         setLeq leq Γ₁' Ω₁ ∧ setLeq leq Γ₂' Ω₂
       ) ->
