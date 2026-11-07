@@ -1,4 +1,4 @@
-import Lisa.Orthologic.NormalizationSoundness
+import Lisa.Orthologic.Internal.NormalizationSoundness
 
 /-! Regression tests for the Scala-style LambdaFOL normalizer and its proofs. -/
 namespace OLNormalizationTests
@@ -71,13 +71,13 @@ private def fromInd : SimpleExpr ind :=
 
 -- Structural orientation is independent of printed representations. Exercise
 -- every constructor, identifier indices, and sorts hidden by typed application.
-private def orderingAtoms : List AlphaBetaEtaNormalization.RawTerm :=
+private def orderingAtoms : List AlphaBetaEtaNormalization.Algorithm.RawTerm :=
   [.bound 0 ind, .bound 1 ind, .bound 0 prop,
    .free ⟨⟨"x", 0⟩, ind⟩, .free ⟨⟨"x", 1⟩, ind⟩, .free ⟨⟨"x", 0⟩, prop⟩,
    .free ⟨⟨"y", 0⟩, ind⟩, .const ⟨⟨"x", 0⟩, ind⟩,
    fromProp.toTerm.erase, fromInd.toTerm.erase]
 
-private def orderingSamples : List AlphaBetaEtaNormalization.RawTerm :=
+private def orderingSamples : List AlphaBetaEtaNormalization.Algorithm.RawTerm :=
   orderingAtoms ++ orderingAtoms.map (.lam ind) ++ orderingAtoms.map (.lam prop) ++
     orderingAtoms.map (fun p => .app p (.bound 0 ind))
 
@@ -103,15 +103,15 @@ private def orderingSamples : List AlphaBetaEtaNormalization.RawTerm :=
 private def collision : SimpleExpr prop := .free ⟨"bound", 0⟩
 #guard !normalizesTo (.lam prop (.conj [.bound (s := prop) 0, collision])) g
 #guard AlphaEq
-    ((computeNormalForm (.lam prop (.lam ind (.conj [.bound (s := prop) 0, .top])))).reify AlphaBetaEtaNormalization.Context.empty)
+    ((computeNormalForm (.lam prop (.lam ind (.conj [.bound (s := prop) 0, .top])))).reify AlphaBetaEtaNormalization.Algorithm.Context.empty)
     (.lam ⟨⟨"u", 7⟩, prop⟩ (.lam ⟨⟨"v", 3⟩, ind⟩ (.var ⟨⟨"u", 7⟩, prop⟩)))
 
 -- The generic result is actual Ordered provability in BOTH directions.
-example (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
+example (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Algorithm.Context) :
     Nonempty (Ordered.AlphaBetaEtaProof {(computeNormalForm p).reify ρ} {p.reify ρ}) :=
   (computeNormalForm_sound p).le ρ
 
-example (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
+example (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Algorithm.Context) :
     Nonempty (Ordered.AlphaBetaEtaProof {p.reify ρ} {(computeNormalForm p).reify ρ}) :=
   (computeNormalForm_sound p).symm.le ρ
 

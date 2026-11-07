@@ -1,4 +1,4 @@
-import Lisa.Checker.Encoding
+import Lisa.Checker.Internal.ProofRelation
 
 /-! Sound positive tests. Failure means that this checker did not establish the
 condition; it never produces a proof of its negation. -/

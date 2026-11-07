@@ -1,12 +1,12 @@
 import Lisa.LambdaFol.ToPureFol.PureFolTranslation
 import Lisa.LambdaFol.ToPureFol.PureFolToOrdered.Embedding
-import Lisa.AlphaBetaEtaNormalization.Elaboration
+import Lisa.AlphaBetaEtaNormalization.Internal.Elaboration
 
 /-! Translation to PureFol followed by embedding preserves canonical syntax exactly.
 Working with erased sorted terms avoids casts when collecting application spines;
 injectivity of erasure recovers equality of the typed terms. -/
 namespace Lisa.LambdaFol.PureFolTranslation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open FirstOrderShape (IsTermOrFunction IsFormulaOrPredicate)
 open PureFolEmbedding (VariableAssignment)
 open Embedding (apps head)

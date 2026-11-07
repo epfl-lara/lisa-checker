@@ -1,4 +1,4 @@
-import Lisa.Orthologic.ExpressionSoundness
+import Lisa.Orthologic.Soundness
 
 /-! End-to-end named-input tests: alpha-beta-eta, logical lowering, OL
 normalization, comparison, reconstruction, and malformed-input behavior. -/

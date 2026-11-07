@@ -1,4 +1,4 @@
-import Lisa.AlphaBetaEtaNormalization.Erasure
+import Lisa.AlphaBetaEtaNormalization.TypedSyntax
 
 /-! A deterministic syntactic order for orienting individual equalities.
 This order is independent of pretty printing and of logical implication.
@@ -17,7 +17,7 @@ private def compareSort : LSort → LSort → Ordering
 private def compareId (a b : Identifier) : Ordering :=
   (compare a.name b.name).then (compare a.idx b.idx)
 
-private def constructorTag : AlphaBetaEtaNormalization.RawTerm → Nat
+private def constructorTag : AlphaBetaEtaNormalization.Algorithm.RawTerm → Nat
   | .bound .. => 0
   | .free .. => 1
   | .const .. => 2
@@ -26,7 +26,7 @@ private def constructorTag : AlphaBetaEtaNormalization.RawTerm → Nat
 
 /-- Compare constructors, then their fields. Erasure retains all variable and
 binder sorts, including the implicit argument sorts of typed applications. -/
-def compareTerms : AlphaBetaEtaNormalization.RawTerm → AlphaBetaEtaNormalization.RawTerm → Ordering
+def compareTerms : AlphaBetaEtaNormalization.Algorithm.RawTerm → AlphaBetaEtaNormalization.Algorithm.RawTerm → Ordering
   | .bound n s, .bound m t => (compareSort s t).then (compare n m)
   | .free x, .free y => (compareSort x.sort y.sort).then (compareId x.id y.id)
   | .const c, .const d => (compareSort c.sort d.sort).then (compareId c.id d.id)

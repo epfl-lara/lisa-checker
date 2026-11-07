@@ -31,12 +31,16 @@ roots = [
   "Tests.LambdaCore",
   "Tests.NamedIntegration",
   "Tests.NamedDecision",
+  "Tests.NormalizationBoundary",
+  "Tests.Support.GhostBoundary",
+  "Tests.OrthologicBoundary",
+  "Tests.CheckerBoundary",
   "Tests.OrderSimulation",
   "Tests.SerializedCorpus",
   "Tests.LambdaFol",
   "Tests.PureFolEpsilon",
-  "Lisa.AlphaBetaEtaNormalization.CoreTests",
-  "Lisa.AlphaBetaEtaNormalization.Tests"
+  "Lisa.AlphaBetaEtaNormalization.Internal.CoreTests",
+  "Lisa.AlphaBetaEtaNormalization.Internal.Tests"
 ]
 
 [[lean_exe]]

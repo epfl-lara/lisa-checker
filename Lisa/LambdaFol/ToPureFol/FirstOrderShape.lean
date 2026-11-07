@@ -1,6 +1,7 @@
+import Lisa.LambdaFol.FirstOrder
 import Lisa.LambdaFol.ToPureFol.SignatureAndVariables
 import Lisa.LambdaFol.ToPureFol.NormalizationScope
-import Lisa.AlphaBetaEtaNormalization.NamedReflection
+import Lisa.AlphaBetaEtaNormalization.Internal.NamedReflection
 
 /-!
 # First-order shapes after lambda normalization
@@ -18,9 +19,7 @@ the canonical-form shape argument from the paper.
 
 namespace Lisa.LambdaFol.FirstOrderShape
 
-open AlphaBetaEtaNormalization
-
-export Signature (arity)
+open AlphaBetaEtaNormalization.Algorithm
 
 mutual
 inductive IsTermOrFunction : {s : LSort} → Term s → Prop where
@@ -61,22 +60,6 @@ theorem IsFormulaOrPredicate.bot : IsFormulaOrPredicate (.const (s := prop) ⟨"
 theorem IsFormulaOrPredicate.eq {t u : Term ind} (ht : IsTermOrFunction t) (hu : IsTermOrFunction u) :
     IsFormulaOrPredicate (.app (.app (.const ⟨"eq", 0⟩) t) u : Term prop) :=
   .app (.app (.symbol 2 _) ht) hu
-
-/-- Exactly the constant sorts admitted in the first-order fragment with epsilon.
-Symbols sharing a printed name at a different sort remain distinct.
--/
-inductive AllowedConstant : LSort → Identifier → Prop where
-  | function (n : Nat) (c : Identifier) : AllowedConstant (arity n ind) c
-  | predicate (n : Nat) (c : Identifier) : AllowedConstant (arity n prop) c
-  | neg : AllowedConstant (prop >> prop) ⟨"not", 0⟩
-  | and : AllowedConstant (prop >> prop >> prop) ⟨"and", 0⟩
-  | or : AllowedConstant (prop >> prop >> prop) ⟨"or", 0⟩
-  | imp : AllowedConstant (prop >> prop >> prop) ⟨"imp", 0⟩
-  | iff : AllowedConstant (prop >> prop >> prop) ⟨"iff", 0⟩
-  | all : AllowedConstant ((ind >> prop) >> prop) ⟨"forall", 0⟩
-  | ex : AllowedConstant ((ind >> prop) >> prop) ⟨"exists", 0⟩
-
-  | epsilon : AllowedConstant ((ind >> prop) >> ind) ⟨"epsilon", 0⟩
 
 theorem AllowedConstant.top : AllowedConstant prop ⟨"top", 0⟩ := .predicate 0 _
 theorem AllowedConstant.bot : AllowedConstant prop ⟨"bot", 0⟩ := .predicate 0 _
@@ -182,13 +165,6 @@ theorem Compatible.rename {e : Term s} (h : Compatible e) (ρ : Ren) :
   | app _ _ ihf iha => exact .app (ihf ρ) (iha ρ)
   | lam _ ih => exact .lam (ih _)
 
-/-- The constant restriction, stated directly on Lisa's named expressions. -/
-def AllowedConstants : Expr → Prop
-  | .var _ => True
-  | .const c => AllowedConstant c.sort c.id
-  | .app f a => AllowedConstants f ∧ AllowedConstants a
-  | .lam _ b => AllowedConstants b
-
 private def resultCompatible : Option Packed.Expr → Prop
   | none => True
   | some ⟨_, t⟩ => Compatible t
@@ -262,7 +238,7 @@ end Lisa.LambdaFol.FirstOrderShape
 The mutual argument follows the first-order grammar. Epsilon bodies and
 quantifier bodies use exactly the same binder calculation. -/
 namespace Lisa.LambdaFol.FirstOrderShape
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 private def ValueRepresentsTerm : (s : LSort) → Depth → Val s → Term s → Prop
   | .ind, d, v, e => v d = e

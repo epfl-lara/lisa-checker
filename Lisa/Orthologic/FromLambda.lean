@@ -28,7 +28,7 @@ def recognizeApp : {s t : LSort} → SimpleExpr (s >> t) → SimpleExpr s → Si
   | _, _, f, a => .app f a
 
 /-- Binding indices are unchanged: both representations count per sort. -/
-def ofTerm : AlphaBetaEtaNormalization.Term s → SimpleExpr s
+def ofTerm : AlphaBetaEtaNormalization.Algorithm.Term s → SimpleExpr s
   | .bound n => .bound n
   | .free x => .free x
   | .const c => recognizeConst _ c

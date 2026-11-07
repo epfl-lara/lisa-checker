@@ -6,7 +6,7 @@ import Lisa.LambdaFol.ToPureFol.FirstOrderSubstitution
 Quantifiers and epsilon share the abstraction calculation. Applying a predicate
 is translated as substitution in its body, expressed using a fresh name. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 namespace FirstOrderCompatibleExpr
 
 def lambda (x : Identifier) (p : FirstOrderCompatibleExpr prop) : FirstOrderCompatibleExpr (ind >> prop) where
@@ -31,7 +31,7 @@ private theorem normalize_lambda (x : Identifier) (p : FirstOrderCompatibleExpr 
   have h : normalize (all (lambda x p)).term = .app (.const ⟨"forall", 0⟩)
       (.lam ind ((SymbolSubstitution.abstract ⟨x, ind⟩).apply (normalize p.term))) := by
     dsimp only [all, lambda, app, constant]
-    rw [normalize_eq_of_equiv (AlphaBetaEtaNormalization.Equiv.app (.refl _) (.lam
+    rw [normalize_eq_of_equiv (AlphaBetaEtaNormalization.Algorithm.Equiv.app (.refl _) (.lam
       ((SymbolSubstitution.abstract ⟨x, ind⟩).equiv (normalize_sound p.term))))]
     exact FirstOrderShape.normalize_formula_eq (.all
       ((FirstOrderShape.normalize_formula p.language p.subst_eq).replace

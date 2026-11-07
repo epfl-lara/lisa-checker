@@ -1,4 +1,4 @@
-import Lisa.AlphaBetaEtaNormalization.Reification
+import Lisa.AlphaBetaEtaNormalization.Algorithm
 
 /-! Internal LambdaFOL syntax for orthologic normalization.
 
@@ -7,9 +7,9 @@ existential quantification are represented through negation. Comparison carries
 polarity separately, so a negative conjunction or universal needs no duplicate
 constructor. Negation can only be applied to a formula.
 
-Binding uses the existing AlphaBetaEtaNormalization convention: zero-based indices count enclosing
+Binding uses the existing AlphaBetaEtaNormalization.Algorithm convention: zero-based indices count enclosing
 binders **of the same sort**. In particular, passing an individual quantifier
-does not shift a propositional variable. Erasure into `AlphaBetaEtaNormalization.Term` reuses its
+does not shift a propositional variable. Erasure into `AlphaBetaEtaNormalization.Algorithm.Term` reuses its
 reification and alpha-renaming proofs.
 -/
 
@@ -45,25 +45,11 @@ def size : SimpleExpr s → Nat
   | .equal a b => a.size + b.size + 1
   | .conj ps => (ps.map size).sum + 1
 
-theorem size_pos (e : SimpleExpr s) : 0 < e.size := by
-  cases e <;> simp [size]
-
-theorem size_lt_conj {p : SimpleExpr prop} {ps : List (SimpleExpr prop)}
-    (h : p ∈ ps) : p.size < (conj ps).size := by
-  induction ps with
-  | nil => simp at h
-  | cons q qs ih =>
-      rcases List.mem_cons.mp h with rfl | h
-      · simp only [size, List.map_cons, List.sum_cons]; omega
-      · have := ih h
-        simp only [size, List.map_cons, List.sum_cons] at *
-        omega
-
-private def termAnd (p q : AlphaBetaEtaNormalization.Term prop) : AlphaBetaEtaNormalization.Term prop :=
+def termAnd (p q : AlphaBetaEtaNormalization.Algorithm.Term prop) : AlphaBetaEtaNormalization.Algorithm.Term prop :=
   .app (.app (.const ⟨"and", 0⟩) p) q
 
-/-- Forget the OL constructors, retaining exactly the AlphaBetaEtaNormalization binding convention. -/
-def toTerm : SimpleExpr s → AlphaBetaEtaNormalization.Term s
+/-- Forget the OL constructors, retaining exactly the AlphaBetaEtaNormalization.Algorithm binding convention. -/
+def toTerm : SimpleExpr s → AlphaBetaEtaNormalization.Algorithm.Term s
   | .bound n => .bound n
   | .free x => .free x
   | .const c => .const c
@@ -77,48 +63,7 @@ def toTerm : SimpleExpr s → AlphaBetaEtaNormalization.Term s
   | .equal a b => .app (.app (.const ⟨"eq", 0⟩) a.toTerm) b.toTerm
   | .neg p => .app (.const ⟨"not", 0⟩) p.toTerm
 
-def reify (p : SimpleExpr s) (ρ : AlphaBetaEtaNormalization.Context) : Expr := p.toTerm.reify ρ
-
-@[simp] theorem reify_const (c : Identifier) (ρ : AlphaBetaEtaNormalization.Context) :
-    (const (s := s) c).reify ρ = Expr.const ⟨c, s⟩ := by
-  simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify]
-
-@[simp] theorem reify_sort (p : SimpleExpr s) (ρ : AlphaBetaEtaNormalization.Context) :
-    (p.reify ρ).sort = some s := AlphaBetaEtaNormalization.Term.reify_sort _ _
-
-@[simp] theorem reify_app (f : SimpleExpr (s >> t)) (a : SimpleExpr s) (ρ : AlphaBetaEtaNormalization.Context) :
-    (app f a).reify ρ = .app (f.reify ρ) (a.reify ρ) := by
-  simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify]
-
-@[simp] theorem reify_neg (p : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
-    (neg p).reify ρ = Expr.neg (p.reify ρ) := by
-  simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify, Expr.neg, SConst.named]
-
-@[simp] theorem reify_conj_pair (p q : SimpleExpr prop) (ρ : AlphaBetaEtaNormalization.Context) :
-    (conj [p, q]).reify ρ = Expr.and (p.reify ρ) (q.reify ρ) := by
-  simp [reify, toTerm, termAnd, AlphaBetaEtaNormalization.Term.reify, Expr.and, SConst.named]
-
-@[simp] theorem reify_top (ρ : AlphaBetaEtaNormalization.Context) : top.reify ρ = Expr.top := by
-  simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify, Expr.top, SConst.named]
-
-@[simp] theorem reify_equal (p q : SimpleExpr ind) (ρ : AlphaBetaEtaNormalization.Context) :
-    (equal p q).reify ρ = Expr.eq (p.reify ρ) (q.reify ρ) := by
-  simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify, Expr.eq, SConst.named]
-
-theorem reify_conj (ps : List (SimpleExpr prop)) (ρ : AlphaBetaEtaNormalization.Context) :
-    (conj ps).reify ρ = match ps.map (fun p => p.reify ρ) with
-      | [] => Expr.top
-      | p :: ps => ps.foldl Expr.and p := by
-  have fold (ps : List (AlphaBetaEtaNormalization.Term prop)) (p : AlphaBetaEtaNormalization.Term prop) :
-      (ps.foldl termAnd p).reify ρ =
-        (ps.map (fun p => p.reify ρ)).foldl Expr.and (p.reify ρ) := by
-    induction ps generalizing p with
-    | nil => rfl
-    | cons q qs ih =>
-        simpa [termAnd, AlphaBetaEtaNormalization.Term.reify, Expr.and, SConst.named] using ih (termAnd p q)
-  cases ps with
-  | nil => simp [reify, toTerm, AlphaBetaEtaNormalization.Term.reify, Expr.top, SConst.named]
-  | cons p ps => simpa [reify, toTerm, List.map_map] using fold (ps.map toTerm) p.toTerm
+def reify (p : SimpleExpr s) (ρ : AlphaBetaEtaNormalization.Algorithm.Context) : Expr := p.toTerm.reify ρ
 
 end SimpleExpr
 end Lisa.Orthologic

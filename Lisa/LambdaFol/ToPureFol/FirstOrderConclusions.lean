@@ -1,3 +1,5 @@
+import Lisa.LambdaFol.FirstOrder
+import Lisa.LambdaFol.Translation
 import Lisa.LambdaFol.ToPureFol.TranslateNamedExpressions
 import Lisa.LambdaFol.ToPureFol.DefaultAssignment
 
@@ -6,22 +8,7 @@ canonical first-order translation. Epsilon remains in the first-order language.
 Intermediate formulas of a derivation need not satisfy these restrictions. -/
 namespace Lisa.LambdaFol
 
-/-- First-order constants, logical constants (including epsilon), and free
-individual/proposition variables. Higher-order bound variables and redexes are
-allowed: canonicalization removes them. -/
-def FirstOrderCompatible (p : Expr) : Prop :=
-  FirstOrderShape.AllowedConstants p ∧
-    ∀ x ∈ p.freeVars, x.sort = ind ∨ x.sort = prop
-
 namespace PureFolTranslation
-
-/-- Canonical translation to PureFol. The default is unreachable on sorted
-first-order-compatible formulas, as proved by `canonicalFormula_spec`. -/
-def canonicalFormula (p : Expr) : PureFol.Formula PureFolTranslation.language :=
-  (fromExprFormula? p).getD .bot
-
-noncomputable def canonicalFormulaSet (Γ : Finset Expr) : Finset (PureFol.Formula PureFolTranslation.language) :=
-  Γ.image canonicalFormula
 
 theorem canonicalFormula_spec {p : Expr} (hp : isFormula p) (hb : FirstOrderCompatible p) :
     fromExprFormula? p = some (canonicalFormula p) := by
@@ -30,9 +17,9 @@ theorem canonicalFormula_spec {p : Expr} (hp : isFormula p) (hb : FirstOrderComp
 
 theorem defaultAssignment_formula {p : Expr} (hp : isFormula p) (hb : FirstOrderCompatible p) :
     FirstOrderAssignment.defaultAssignment.toPureFolFormula p = canonicalFormula p := by
-  obtain ⟨e, he⟩ := AlphaBetaEtaNormalization.interpretNamed_sorted hp AlphaBetaEtaNormalization.Names.free
+  obtain ⟨e, he⟩ := AlphaBetaEtaNormalization.Algorithm.interpretNamed_sorted hp AlphaBetaEtaNormalization.Algorithm.Names.free
   let a : FirstOrderCompatibleExpr prop :=
-    ⟨e, FirstOrderShape.compatible_of_interpretNamed he hb.1 hb.2, AlphaBetaEtaNormalization.subst_of_interpretNamed he⟩
+    ⟨e, FirstOrderShape.compatible_of_interpretNamed he hb.1 hb.2, AlphaBetaEtaNormalization.Algorithm.subst_of_interpretNamed he⟩
   have hf : FirstOrderAssignment.defaultAssignment.applyExpr p hp = a := by
     rw [FirstOrderAssignment.applyExpr_of_named _ p hp he]
     exact FirstOrderAssignment.defaultAssignment_apply a

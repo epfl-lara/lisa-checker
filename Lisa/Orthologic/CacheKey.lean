@@ -1,22 +1,16 @@
+import Lisa.Orthologic.Internal.Size
 import Lisa.Orthologic.Syntax
 
 /-! Exact structural equality for the cache keys. In particular, two internal
-trees that erase to the same AlphaBetaEtaNormalization term need not be the same normalization
+trees that erase to the same AlphaBetaEtaNormalization.Algorithm term need not be the same normalization
 query. Neither erased terms nor hashes alone are used as keys. -/
 
 namespace Lisa.Orthologic
 
-private def listEq (f : α → β → Bool) : List α → List β → Bool
+def CacheKey.listEq (f : α → β → Bool) : List α → List β → Bool
   | [], [] => true
-  | a :: as, b :: bs => f a b && listEq f as bs
+  | a :: as, b :: bs => f a b && CacheKey.listEq f as bs
   | _, _ => false
-
-private theorem listEq_iff (f : α → β → Bool) (u : α → γ) (v : β → γ)
-    (h : ∀ a b, f a b = true ↔ u a = v b) (as : List α) (bs : List β) :
-    listEq f as bs = true ↔ as.map u = bs.map v := by
-  induction as generalizing bs with
-  | nil => cases bs <;> simp [listEq]
-  | cons a as ih => cases bs <;> simp [listEq, h, ih]
 
 namespace SimpleExpr
 
@@ -28,7 +22,7 @@ def sameSyntax (p q : SimpleExpr s) : Bool :=
       if h : a = b then sameSyntax (h ▸ f) g && sameSyntax (h ▸ x) y else false
   | .lam _ p, .lam _ q => sameSyntax p q
   | .top, .top => true
-  | .conj ps, .conj qs => listEq (fun p q => sameSyntax p.val q.val) ps.attach qs.attach
+  | .conj ps, .conj qs => CacheKey.listEq (fun p q => sameSyntax p.val q.val) ps.attach qs.attach
   | .all p, .all q | .neg p, .neg q => sameSyntax p q
   | .equal a b, .equal c d => sameSyntax a c && sameSyntax b d
   | _, _ => false
@@ -37,34 +31,6 @@ decreasing_by
   all_goals try subst_vars
   all_goals try (simp only [size]; omega)
   all_goals exact size_lt_conj p.property
-
-theorem sameSyntax_eq (p q : SimpleExpr s) : sameSyntax p q = true ↔ p = q := by
-  apply SimpleExpr.rec
-    (motive_1 := fun s p => ∀ q : SimpleExpr s, sameSyntax p q = true ↔ p = q)
-    (motive_2 := fun ps => ∀ p ∈ ps, ∀ q, sameSyntax p q = true ↔ p = q)
-    (t := p)
-  all_goals repeat intro
-  case nil => simp_all
-  case cons head tail ihh iht a ha b =>
-    rcases List.mem_cons.mp ha with rfl | ha
-    · exact ihh b
-    · exact iht a ha b
-  case app s t f a ihf iha q =>
-    cases q <;> try simp [sameSyntax]
-    rename_i u g b
-    by_cases hs : s = u
-    · subst u; simp [ihf, iha]
-    · simp [hs]
-  case conj ps ih q =>
-    cases q <;> try simp [sameSyntax]
-    rename_i qs
-    simpa using listEq_iff (fun p q => sameSyntax p.val q.val)
-      (fun p : {p // p ∈ ps} => p.val) (fun q : {q // q ∈ qs} => q.val)
-      (fun p q => ih p.val p.property q.val) ps.attach qs.attach
-  all_goals rename_i q; cases q <;> simp_all [sameSyntax]
-
-instance : DecidableEq (SimpleExpr s) := fun p q =>
-  decidable_of_iff (sameSyntax p q = true) (sameSyntax_eq p q)
 
 end SimpleExpr
 end Lisa.Orthologic

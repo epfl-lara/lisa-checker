@@ -1,11 +1,11 @@
-import Lisa.AlphaBetaEtaNormalization.Normalization
-import Lisa.AlphaBetaEtaNormalization.NamedReflection
+import Lisa.AlphaBetaEtaNormalization.Internal.Normalization
+import Lisa.AlphaBetaEtaNormalization.Internal.NamedReflection
 
 /-! Normalization preserves scope: locally closed terms have no dangling bound indices.
 The final section records the exact free names of named interpretation. -/
 
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 /-- Extending an environment preserves a property satisfied by all its values. -/
 theorem env_extend {P : (s : LSort) → Val s → Prop} {η : Env} {a : Val s}

@@ -9,7 +9,7 @@ binder-renaming laws needed to transport proofs. No normalization is involved.
 
 namespace Lisa.LambdaFol
 
-open Expr AlphaBetaEtaNormalization
+open Expr AlphaBetaEtaNormalization.Algorithm
 
 /-- A simultaneous substitution of free variables by expressions of the same sort. -/
 structure Instantiation where

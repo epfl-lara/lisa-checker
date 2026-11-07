@@ -1,5 +1,5 @@
 import Lisa.AlphaBetaEtaOrder
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
+import Lisa.AlphaBetaEtaNormalization
 
 /-! A certified higher-order substitution example for the OL reorganization,
 along with checks distinguishing it from alpha-beta-eta conversion. -/

@@ -7,6 +7,8 @@ LambdaFOL proof systems and syntactic equivalence with first-order logic retaini
 * `LambdaFol/ProofSystem.lean`: the full calculus.
 * `LambdaFol/WithoutInstantiation.lean`: the calculus without schematic instantiation.
 * `LambdaFol/PureFol.lean`: independent first-order syntax and inference rules.
+* `LambdaFol/FirstOrder.lean`: restrictions on concluding expressions.
+* `LambdaFol/Translation.lean`: their canonical first-order translation.
 * `LambdaFol/Statements.lean`: the final equivalence theorems.
 
 The proof stages are `FromOrdered/`, `EliminateInstantiation/`, and `ToPureFol/`.

@@ -4,7 +4,7 @@ import Lisa.Ordered
 /-! Replacement templates commute with schematic substitution after freshening
 their formal parameters. Replacement images are never substituted into each other. -/
 namespace Lisa.LambdaFol.Instantiation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 def identity : Instantiation := ⟨.nil, trivial⟩
 

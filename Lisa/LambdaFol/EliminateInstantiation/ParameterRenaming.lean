@@ -2,7 +2,7 @@ import Lisa.LambdaFol.EliminateInstantiation.InstantiationComposition
 import Lisa.LambdaFol.ToPureFol.SignatureAndVariables
 /-! Fresh parameter lists for pushing substitution through an inference rule. -/
 namespace Lisa.LambdaFol.Instantiation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 /-- Replace a finite list of names using a sort-preserving renaming.
 Repeated parameters receive the same image. -/

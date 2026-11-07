@@ -7,7 +7,7 @@ is provable equivalence. At function sorts it preserves related arguments.
 The syntax induction `apply_preserves_related` reduces the proof to source symbols;
 the remaining lemmas verify the first-order and logical symbols. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 /-- Relate syntax using derivations at ground sorts and applications at arrow sorts. -/
 def ProvablyRelated (Γ Δ : Finset (PureFol.Formula PureFolTranslation.language)) :

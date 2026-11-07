@@ -5,10 +5,10 @@ import Lisa.LambdaFol.ToPureFol.PureFolTranslation
 no dangling bound indices. `FirstOrderAssignment` replaces source leaves by such expressions.
 The translation normalizes these expressions and writes the result in PureFol syntax. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open FirstOrderShape (Compatible)
 
-/-- AlphaBetaEtaNormalization syntax over the first-order signature, before normalization, with no
+/-- AlphaBetaEtaNormalization.Algorithm syntax over the first-order signature, before normalization, with no
 dangling bound indices. Free individual and proposition names are allowed. -/
 structure FirstOrderCompatibleExpr (s : LSort) where
   term : Term s
@@ -127,11 +127,11 @@ def extend (R : FirstOrderAssignment) (a : FirstOrderCompatibleExpr b) : FirstOr
 @[simp] theorem extend_other (R : FirstOrderAssignment) (a : FirstOrderCompatibleExpr b) (h : s ≠ b) :
     (R.extend a).bound s n = R.bound s n := by simp [extend, h]
 
-private theorem equiv_of_eq {e f : Term s} (h : e = f) : AlphaBetaEtaNormalization.Equiv e f := h ▸ .refl e
+private theorem equiv_of_eq {e f : Term s} (h : e = f) : AlphaBetaEtaNormalization.Algorithm.Equiv e f := h ▸ .refl e
 
 theorem apply_lam (R : FirstOrderAssignment) (e : Term t) (a : FirstOrderCompatibleExpr s) :
     Equiv ((R.apply (.lam s e)).app a).term ((R.extend a).apply e).term := by
-  apply AlphaBetaEtaNormalization.Equiv.trans (AlphaBetaEtaNormalization.Equiv.beta _ a.term)
+  apply AlphaBetaEtaNormalization.Algorithm.Equiv.trans (AlphaBetaEtaNormalization.Algorithm.Equiv.beta _ a.term)
   apply equiv_of_eq
   change ((R.replacement.lift s).apply e).instantiate a.term = (R.extend a).replacement.apply e
   simp only [Term.instantiate, ← SymbolSubstitution.apply_ofSub, SymbolSubstitution.apply_apply]
@@ -152,8 +152,6 @@ theorem apply_lam (R : FirstOrderAssignment) (e : Term t) (a : FirstOrderCompati
     simpa only [SymbolSubstitution.comp, SymbolSubstitution.lift, SymbolSubstitution.apply_ofSub,
       replacement, extend] using (R.const u c).term.shift_instantiate a.term
 end FirstOrderAssignment
-
-noncomputable instance : DecidableEq (PureFol.Formula PureFolTranslation.language) := Classical.decEq _
 
 namespace FirstOrderCompatibleExpr
 

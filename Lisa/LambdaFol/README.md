@@ -32,14 +32,15 @@ The hypotheses require every concluding expression to:
 - Have free variables only of sort `ind` or `prop`.
 
 The last two conditions form `FirstOrderCompatible`, defined in
-[FirstOrderConclusions.lean](ToPureFol/FirstOrderConclusions.lean). They allow higher-order lambda
+[FirstOrder.lean](FirstOrder.lean). They allow higher-order lambda
 abstractions and applications inside the concluding expressions: normalization
 removes those that cannot occur in first-order syntax. Free proposition
 variables become nullary predicate symbols in PureFol.
 
 **These restrictions apply only to the concluding sequent.** Intermediate
 formulas may contain free higher-order variables. `canonicalFormulaSet` normalizes
-each concluding formula and writes it using PureFol's constructors. The translation
+each concluding formula and writes it using PureFol's constructors; its definition
+is in [Translation.lean](Translation.lean). The translation
 is proved to succeed under the theorem's hypotheses.
 
 ## The proof in four systems
@@ -72,7 +73,9 @@ Start with [Syntax.lean](Syntax.lean) for shared formula classes, then the
 three calculi: [ProofSystem.lean](ProofSystem.lean),
 [WithoutInstantiation.lean](WithoutInstantiation.lean), and
 [PureFol.lean](PureFol.lean). [Statements.lean](Statements.lean) collects the
-final equivalences. In PureFol, you can initially skip renaming and substitution
+final equivalences. [FirstOrder.lean](FirstOrder.lean) and
+[Translation.lean](Translation.lean) define their conclusion restrictions and
+canonical PureFol translation. In PureFol, you can initially skip renaming and substitution
 lemmas and go straight to `ProofTree`.
 
 Then follow the three proof stages:
@@ -111,47 +114,49 @@ definitions, translations, and proof results; supporting files are unbolded.
 
 1. **[Syntax.lean](Syntax.lean)**
 2. **[PureFol.lean](PureFol.lean)**
-3. **[WithoutInstantiation.lean](WithoutInstantiation.lean)**
-4. [ToPureFol/FormulaClasses.lean](ToPureFol/FormulaClasses.lean)
-5. [EliminateInstantiation/Instantiation.lean](EliminateInstantiation/Instantiation.lean)
-6. **[ProofSystem.lean](ProofSystem.lean)**
-7. [ToPureFol/SymbolSubstitution.lean](ToPureFol/SymbolSubstitution.lean)
-8. [EliminateInstantiation/InstantiationComposition.lean](EliminateInstantiation/InstantiationComposition.lean)
-9. [ToPureFol/SignatureAndVariables.lean](ToPureFol/SignatureAndVariables.lean)
-10. [EliminateInstantiation/ParameterRenaming.lean](EliminateInstantiation/ParameterRenaming.lean)
-11. [EliminateInstantiation/InstantiateTemplate.lean](EliminateInstantiation/InstantiateTemplate.lean)
-12. [EliminateInstantiation/InstantiateRuleData.lean](EliminateInstantiation/InstantiateRuleData.lean)
-13. [EliminateInstantiation/Conjunction.lean](EliminateInstantiation/Conjunction.lean)
-14. [EliminateInstantiation/InstantiateReplacement.lean](EliminateInstantiation/InstantiateReplacement.lean)
-15. **[EliminateInstantiation/InstantiateProof.lean](EliminateInstantiation/InstantiateProof.lean)**
-16. **[EliminateInstantiation/Equivalence.lean](EliminateInstantiation/Equivalence.lean)**
-17. [ToPureFol/NormalizationScope.lean](ToPureFol/NormalizationScope.lean)
-18. **[ToPureFol/FirstOrderShape.lean](ToPureFol/FirstOrderShape.lean)**
-19. **[ToPureFol/PureFolTranslation.lean](ToPureFol/PureFolTranslation.lean)**
-20. **[ToPureFol/FirstOrderExpressions.lean](ToPureFol/FirstOrderExpressions.lean)**
-21. [ToPureFol/FirstOrderSubstitution.lean](ToPureFol/FirstOrderSubstitution.lean)
-22. [ToPureFol/PureFolSubstitution.lean](ToPureFol/PureFolSubstitution.lean)
-23. [ToPureFol/PureFolTranslationSubstitution.lean](ToPureFol/PureFolTranslationSubstitution.lean)
-24. [ToPureFol/ScopedSubstitution.lean](ToPureFol/ScopedSubstitution.lean)
-25. [ToPureFol/Binders.lean](ToPureFol/Binders.lean)
-26. **[ToPureFol/TranslateNamedExpressions.lean](ToPureFol/TranslateNamedExpressions.lean)**
-27. **[ToPureFol/DefaultAssignment.lean](ToPureFol/DefaultAssignment.lean)**
-28. [ToPureFol/PureFolDerivedRules.lean](ToPureFol/PureFolDerivedRules.lean)
-29. [ToPureFol/RelatedExpressions.lean](ToPureFol/RelatedExpressions.lean)
-30. [ToPureFol/ReplacementRule.lean](ToPureFol/ReplacementRule.lean)
-31. **[ToPureFol/TranslateProof.lean](ToPureFol/TranslateProof.lean)**
-32. [ToPureFol/PureFolToOrdered/Embedding.lean](ToPureFol/PureFolToOrdered/Embedding.lean)
-33. [ToPureFol/PureFolToOrdered/Roundtrip.lean](ToPureFol/PureFolToOrdered/Roundtrip.lean)
-34. [ToPureFol/PureFolToOrdered/NamedExpressions.lean](ToPureFol/PureFolToOrdered/NamedExpressions.lean)
-35. **[ToPureFol/PureFolToOrdered/TranslateProof.lean](ToPureFol/PureFolToOrdered/TranslateProof.lean)**
-36. **[ToPureFol/FirstOrderConclusions.lean](ToPureFol/FirstOrderConclusions.lean)**
-37. **[ToPureFol/PureFolToOrdered/Equivalence.lean](ToPureFol/PureFolToOrdered/Equivalence.lean)**
-38. [FromOrdered/SequentEncoding.lean](FromOrdered/SequentEncoding.lean)
-39. **[FromOrdered/TranslateProof.lean](FromOrdered/TranslateProof.lean)**
-40. **[ToPureFol/Equivalence.lean](ToPureFol/Equivalence.lean)**
-41. **[ToPureFol/FromOrdered.lean](ToPureFol/FromOrdered.lean)**
-42. **[Statements.lean](Statements.lean)**
-43. **[LambdaFol.lean](../LambdaFol.lean)**
+3. **[FirstOrder.lean](FirstOrder.lean)**
+4. **[Translation.lean](Translation.lean)**
+5. **[WithoutInstantiation.lean](WithoutInstantiation.lean)**
+6. [ToPureFol/FormulaClasses.lean](ToPureFol/FormulaClasses.lean)
+7. [EliminateInstantiation/Instantiation.lean](EliminateInstantiation/Instantiation.lean)
+8. **[ProofSystem.lean](ProofSystem.lean)**
+9. [ToPureFol/SymbolSubstitution.lean](ToPureFol/SymbolSubstitution.lean)
+10. [EliminateInstantiation/InstantiationComposition.lean](EliminateInstantiation/InstantiationComposition.lean)
+11. [ToPureFol/SignatureAndVariables.lean](ToPureFol/SignatureAndVariables.lean)
+12. [EliminateInstantiation/ParameterRenaming.lean](EliminateInstantiation/ParameterRenaming.lean)
+13. [EliminateInstantiation/InstantiateTemplate.lean](EliminateInstantiation/InstantiateTemplate.lean)
+14. [EliminateInstantiation/InstantiateRuleData.lean](EliminateInstantiation/InstantiateRuleData.lean)
+15. [EliminateInstantiation/Conjunction.lean](EliminateInstantiation/Conjunction.lean)
+16. [EliminateInstantiation/InstantiateReplacement.lean](EliminateInstantiation/InstantiateReplacement.lean)
+17. **[EliminateInstantiation/InstantiateProof.lean](EliminateInstantiation/InstantiateProof.lean)**
+18. **[EliminateInstantiation/Equivalence.lean](EliminateInstantiation/Equivalence.lean)**
+19. [ToPureFol/NormalizationScope.lean](ToPureFol/NormalizationScope.lean)
+20. **[ToPureFol/FirstOrderShape.lean](ToPureFol/FirstOrderShape.lean)**
+21. **[ToPureFol/PureFolTranslation.lean](ToPureFol/PureFolTranslation.lean)**
+22. **[ToPureFol/FirstOrderExpressions.lean](ToPureFol/FirstOrderExpressions.lean)**
+23. [ToPureFol/FirstOrderSubstitution.lean](ToPureFol/FirstOrderSubstitution.lean)
+24. [ToPureFol/PureFolSubstitution.lean](ToPureFol/PureFolSubstitution.lean)
+25. [ToPureFol/PureFolTranslationSubstitution.lean](ToPureFol/PureFolTranslationSubstitution.lean)
+26. [ToPureFol/ScopedSubstitution.lean](ToPureFol/ScopedSubstitution.lean)
+27. [ToPureFol/Binders.lean](ToPureFol/Binders.lean)
+28. **[ToPureFol/TranslateNamedExpressions.lean](ToPureFol/TranslateNamedExpressions.lean)**
+29. **[ToPureFol/DefaultAssignment.lean](ToPureFol/DefaultAssignment.lean)**
+30. [ToPureFol/PureFolDerivedRules.lean](ToPureFol/PureFolDerivedRules.lean)
+31. [ToPureFol/RelatedExpressions.lean](ToPureFol/RelatedExpressions.lean)
+32. [ToPureFol/ReplacementRule.lean](ToPureFol/ReplacementRule.lean)
+33. **[ToPureFol/TranslateProof.lean](ToPureFol/TranslateProof.lean)**
+34. [ToPureFol/PureFolToOrdered/Embedding.lean](ToPureFol/PureFolToOrdered/Embedding.lean)
+35. [ToPureFol/PureFolToOrdered/Roundtrip.lean](ToPureFol/PureFolToOrdered/Roundtrip.lean)
+36. [ToPureFol/PureFolToOrdered/NamedExpressions.lean](ToPureFol/PureFolToOrdered/NamedExpressions.lean)
+37. **[ToPureFol/PureFolToOrdered/TranslateProof.lean](ToPureFol/PureFolToOrdered/TranslateProof.lean)**
+38. **[ToPureFol/FirstOrderConclusions.lean](ToPureFol/FirstOrderConclusions.lean)**
+39. **[ToPureFol/PureFolToOrdered/Equivalence.lean](ToPureFol/PureFolToOrdered/Equivalence.lean)**
+40. [FromOrdered/SequentEncoding.lean](FromOrdered/SequentEncoding.lean)
+41. **[FromOrdered/TranslateProof.lean](FromOrdered/TranslateProof.lean)**
+42. **[ToPureFol/Equivalence.lean](ToPureFol/Equivalence.lean)**
+43. **[ToPureFol/FromOrdered.lean](ToPureFol/FromOrdered.lean)**
+44. **[Statements.lean](Statements.lean)**
+45. **[LambdaFol.lean](../LambdaFol.lean)**
 
 The documentation consists of this overview, the
 [Ordered translation guide](FromOrdered/README.md), the

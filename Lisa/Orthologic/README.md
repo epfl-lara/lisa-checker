@@ -1,35 +1,53 @@
 # Orthologic normalization for LambdaFOL
 
-This package recognizes equivalences and implications that the proof checker can
-use without an explicit user proof. Every accepted comparison is justified by a
-proof in `Ordered AlphaBetaEta`. A rejected comparison does not assert that the
-formulas are inequivalent or that the implication is unprovable.
+This package computes sound equivalences and implications for the proof checker.
+Its accepted comparisons are justified in `Ordered AlphaBetaEta`. Rejection does
+not establish inequivalence or unprovability. There is no search fuel.
 
-## Start with the public interface
+## Public interface
 
-Import [Expression.lean](Expression.lean) for the executable definitions, or
-[ExpressionSoundness.lean](ExpressionSoundness.lean) for their guarantees.
-The following functions are in `Lisa.Orthologic`:
+Import `Lisa.Orthologic`. Read these four files for the operations and their
+meaning; their theorem statements use Lisa expressions and the Ordered system.
 
-| Function | Result |
+| File | What it exposes |
 | --- | --- |
-| `normalize p` | `Option Expr`: a named expression interchangeable with `p`. |
-| `isSame p q` | `Option Bool`: compare expressions of any sort for equivalence. |
-| `isImplying p q` | `Option Bool`: compare formulas in the implication direction. |
+| **[Expression.lean](Expression.lean)** | `normalize`, `isSame`, `isImplying`: the uncached named-expression pipeline. |
+| **[Equivalence.lean](Equivalence.lean)** | `ContextEq`: interchangeability in formula applications, including at function sorts. |
+| **[Soundness.lean](Soundness.lean)** | Preservation, accepted-comparison soundness, failure conditions, and recognition of αβη-equivalence. |
+| **[Cached.lean](Cached.lean)** | Cached entry points and exact agreement with the uncached pipeline. |
 
-`normalize` returns `none` exactly for ill-sorted input. `isSame` returns `none`
-exactly when either input is ill-sorted, and `some false` for different sorts.
-`isImplying` returns `none` unless both inputs are formulas. There is no fuel.
+`normalize p` returns `Option Expr`. It fails exactly when `p` is ill-sorted;
+otherwise its result has the same sort and is contextually equivalent to `p`.
+The output's spelling is not claimed to be a unique representative of OL equivalence.
 
-For memoized execution, import [Cached.lean](Cached.lean) or
-[CachedSoundness.lean](CachedSoundness.lean) and use the same names under `Cached`.
-The checker uses these cached functions through
-[Checker/ProofRelation.lean](../Checker/ProofRelation.lean).
+`isSame p q` returns `Option Bool`. It fails exactly when either input is
+ill-sorted. Success with `true` establishes contextual equivalence at their
+common sort; for formulas, it gives Ordered proofs in both directions.
+Different well-sorted result sorts give `some false`.
+
+`isImplying p q` fails unless both inputs have proposition sort. Success with
+`true` gives an Ordered proof of `p ⊢ q`.
+
+`Cached.normalize`, `Cached.isSame`, and `Cached.isImplying` have the same
+results for every cache configuration. The checker uses these cached operations
+through [Checker/ProofRelation.lean](../Checker/ProofRelation.lean).
+
+## Definitions and ghost proofs
+
+Executable definitions remain at the top level. `Internal/` contains supporting
+proofs and their auxiliary constructions. Public signatures and non-erased
+definitions do not depend on declarations from `Internal`; proof bodies may.
+This also applies to dependencies on AlphaBetaEtaNormalization's proof files.
+
+Termination arguments and cache certificates are erased proofs. They may use
+internal lemmas without making the computation depend on ghost code. Some
+proof files extend the executable declarations' namespace: declaration origins,
+not namespace spelling, determine the boundary.
 
 ## The computation
 
-1. **Canonicalize by αβη.** `AlphaBetaEtaNormalization.interpretNamed` checks sorts and translates
-   names into typed lambda terms. `AlphaBetaEtaNormalization.normalize` produces their canonical
+1. **Canonicalize by αβη.** `AlphaBetaEtaNormalization.Algorithm.interpretNamed` checks sorts and translates
+   names into typed lambda terms. `AlphaBetaEtaNormalization.Algorithm.normalize` produces their canonical
    forms. This makes αβη-equivalent inputs identical before OL starts.
 2. **Expose logical structure.** `SimpleExpr.ofTerm` recognizes logical constants
    and their applications. Its internal syntax has conjunction lists, negation,
@@ -77,36 +95,9 @@ OL there; the epsilon terms are not opaque atoms. Normalization visits those
 same children before the final comparison.
 
 `SimpleExpr s` records the expression's sort in its type. Bound indices count
-enclosing binders of the same sort, following `AlphaBetaEtaNormalization.Term`. Translation to and
+enclosing binders of the same sort, following `AlphaBetaEtaNormalization.Algorithm.Term`. Translation to and
 from lambda terms preserves this convention. Named output uses fresh names to
 avoid capture.
-
-## What the proofs establish
-
-The proof files build actual Ordered derivations. Three definitions connect
-the internal computation to those derivations:
-
-- `ContextEq s p q` says that every well-sorted expression `k : s → prop`
-  gives proofs of both `k p ⊢ k q` and `k q ⊢ k p`. This expresses replacement
-  even at function sorts, without adding a higher-order equality symbol.
-- `ProvableEQ p q` requires this contextual equivalence after reconstructing
-  names under every naming assignment.
-- `ProvableLE p q` requires a proof of `p ⊢ q` under every naming assignment.
-
-Application and lambda congruence are derived using the proof system's
-substitution rule. Freshness conditions ensure that these derivations also
-work underneath binders.
-
-The main results are `latticesEQ_sound`, `polarLEQ_sound` and
-`computeNormalForm_sound`. They establish accepted equivalence, accepted
-implication and preservation by normalization, respectively.
-`isSame_sound` and `isImplying_sound` carry those results back to the original
-named inputs. `prepare_alphaBetaEta` proves that well-sorted αβη-equivalent
-inputs have identical prepared expressions.
-
-These are soundness results, not completeness or uniqueness-of-normal-form
-results. The tests audit their dependencies against Lean's standard axioms
-`propext`, `Classical.choice` and `Quot.sound`.
 
 ## Memoization
 
@@ -136,32 +127,31 @@ is disabled. The `keys` category covers both lambda terms and equality-order key
 The caller owns the cache lifetime. The checker currently shares work within
 each comparison, but starts fresh for separate rule-condition tests.
 
-## Files in dependency order
+## Executable support, in dependency order
 
-All package Lean files appear below, with their local dependencies first.
-**Bold files** contain the main algorithms and end-to-end guarantees; the others
-provide their representation, proof lemmas or cache support.
+These files explain how the public operations compute. They contain real data
+and algorithms, not ghost implementations hidden behind public wrappers.
 
-| File | What to read it for |
+| File | Responsibility |
 | --- | --- |
-| [Syntax.lean](Syntax.lean) | Typed internal expressions, binding, translation to lambda terms and named reconstruction. |
-| **[Comparison.lean](Comparison.lean)** | The mutual recursion of implication and equivalence. |
-| [StructuralOrder.lean](StructuralOrder.lean) | Deterministic operand order for individual equality. |
-| **[Normalization.lean](Normalization.lean)** | The OL transformations and their traversal order. |
-| [Derivation.lean](Derivation.lean) | Reusable Ordered proof steps for connectives, substitution and quantifiers. |
-| [Congruence.lean](Congruence.lean) | Contextual equivalence and replacement beneath applications and lambdas. |
-| [Provability.lean](Provability.lean) | Transfer those proof steps to internal expressions and conjunction lists. |
-| **[ComparisonSoundness.lean](ComparisonSoundness.lean)** | Justify each comparison branch by an Ordered derivation. |
-| **[NormalizationSoundness.lean](NormalizationSoundness.lean)** | Justify each transformation, then the whole normalizer. |
-| [FromLambda.lean](FromLambda.lean) | Recognize logical structure in typed lambda terms. |
-| [FromLambdaSoundness.lean](FromLambdaSoundness.lean) | Prove the recognized forms equivalent to the input terms. |
-| **[Expression.lean](Expression.lean)** | The complete executable pipeline on Lisa expressions. |
-| **[ExpressionSoundness.lean](ExpressionSoundness.lean)** | Public soundness, αβη invariance, sorting and failure conditions. |
-| [CacheKey.lean](CacheKey.lean) | Exact equality for keys and its correctness proof. |
-| **[Cached.lean](Cached.lean)** | Memoized computation with exact-agreement certificates. |
-| [CachedSoundness.lean](CachedSoundness.lean) | Transfer soundness to the cached public functions. |
+| [Syntax.lean](Syntax.lean) | Sorted OL expressions, their size, translation to typed lambda terms, and named reconstruction. |
+| [StructuralOrder.lean](StructuralOrder.lean) | Deterministic orientation of individual-equality operands. |
+| [Comparison.lean](Comparison.lean) | Mutually recursive lattice implication and equivalence. |
+| [Normalization.lean](Normalization.lean) | Refinement, pruning, contradiction detection, and bottom-up normalization. |
+| [FromLambda.lean](FromLambda.lean) | Recognize logical structure in canonical typed lambda terms. |
+| **[Expression.lean](Expression.lean)** | Assemble the named-expression pipeline. |
+| [CacheKey.lean](CacheKey.lean) | Exact structural comparison of cache keys. |
+| [Cache.lean](Cache.lean) | Cache data, certificates, configuration, statistics, and decidable key equality. |
+| [CacheAlgorithm.lean](CacheAlgorithm.lean) | Memoized traversals and recursive algorithms. |
+| **[Cached.lean](Cached.lean)** | Convenient entry points and agreement theorems. |
+
+The [proof guide](Internal/README.md) lists the supporting proof files and
+explains how their results yield the contracts in `Soundness.lean`.
 
 ## Checking changes
+
+[Tests/OrthologicBoundary.lean](../../Tests/OrthologicBoundary.lean) checks all
+top-level signatures and executable definitions against the ghost boundary.
 
 Run `lake build Lisa lisa-checker Tests` from the project root. The OL regression
 files cover complementary concerns:

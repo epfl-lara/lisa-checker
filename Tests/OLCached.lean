@@ -1,4 +1,4 @@
-import Lisa.Orthologic.CachedSoundness
+import Lisa.Orthologic.Soundness
 
 /-! Exact agreement, cache reuse, and binding-sensitive regression tests. -/
 namespace OLCachedTests
@@ -139,7 +139,7 @@ private def sharedDag : Nat → SimpleExpr prop
     throw (IO.userError "Warm normalization recomputed a subtree")
 
 -- Exact keys distinguish an explicit application from its logical constructor,
--- even when both erase to the same AlphaBetaEtaNormalization term.
+-- even when both erase to the same AlphaBetaEtaNormalization.Algorithm term.
 private def rawAnd : SimpleExpr prop :=
   .app (.app (.const ⟨"and", 0⟩) p) .top
 #guard rawAnd.toTerm = (SimpleExpr.conj [p, .top]).toTerm

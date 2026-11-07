@@ -1,3 +1,4 @@
+import Lisa.Orthologic.Internal.Size
 import Lisa.Orthologic.Syntax
 
 /-! The mutually recursive comparisons used by OL normalization.

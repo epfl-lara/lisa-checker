@@ -1,4 +1,4 @@
-import Lisa.Checker.ProofRelation
+import Lisa.Checker.Internal.ProofRelation
 
 open Lisa Expr
 

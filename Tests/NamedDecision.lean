@@ -1,4 +1,4 @@
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
+import Lisa.AlphaBetaEtaNormalization
 
 namespace Lisa.Tests.NamedDecision
 
@@ -39,12 +39,6 @@ private def pBeta : SortedExpr prop := ⟨.app idX (.var x), rfl⟩
 #guard decide (p.Equivalent pBeta)
 #guard !decide (p.Equivalent q)
 
-private def freeX1 : Term (prop >> prop) := .lam prop (.free ⟨"x", 1⟩)
-
-#guard freeX1.reify Context.empty =
-  .lam ⟨⟨"x", 2⟩, prop⟩ (.var ⟨⟨"x", 1⟩, prop⟩)
-#guard interpretNamed (freeX1.reify Context.empty) Names.free = some ⟨_, freeX1⟩
-
 private def samples : List Expr :=
   [.var x, .var y, .var xInd, f, idX, idY, capture, betaEta,
     .app idX (.var x), .app idY (.var y), .app betaEta (.var y), .app f (.var y),
@@ -65,9 +59,6 @@ private def agrees (p q : Expr) : Bool :=
   | none => true
   | some q => normalizeNamed q == some q
 
-example {e f : Term s} (h : Equiv e f) (ρ : Context) :
-    AlphaBetaEta (e.reify ρ) (f.reify ρ) := h.reify ρ
-
 example {p q : Expr} (hp : p.hasSort s) : compareNamed p q = some true ↔ AlphaBetaEta p q :=
   by rw [compareNamed_true]; exact and_iff_left (Option.isSome_iff_exists.mpr ⟨s, hp⟩)
 
@@ -80,11 +71,6 @@ example {p q : Expr} (hp : p.hasSort s) : AlphaBetaEta p q ↔ normalizeNamed p 
 example {p q : Expr} (h : normalizeNamed p = some q) : normalizeNamed q = some q :=
   normalizeNamed_idempotent h
 
-example (e : Term s) :
-    interpretNamed (e.reify Context.empty) Names.free = some ⟨s, e.subst Context.empty.toSub⟩ := interpretNamed_reify_free e Context.empty
-
-#print axioms interpretNamed_reify
-#print axioms Equiv.reify
 #print axioms compareNamed_true
 #print axioms compareNamed_false
 #print axioms normalizeNamed_sound

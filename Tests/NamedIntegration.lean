@@ -1,8 +1,8 @@
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
+import Lisa.AlphaBetaEtaNormalization.Internal.NamedDecision
 
 namespace Lisa.Tests.NamedIntegration
 
-open Lisa.AlphaBetaEtaNormalization
+open Lisa.AlphaBetaEtaNormalization.Algorithm
 
 private def x : SVar := ⟨⟨"x", 0⟩, prop⟩
 private def y : SVar := ⟨⟨"y", 0⟩, prop⟩
@@ -115,4 +115,20 @@ example : AlphaEq (.lam x (.var x)) (.lam y (.var y)) ↔
 #print axioms compareNamed_true
 #print axioms compareNamed_false
 
+private def freeX1 : Term (prop >> prop) := .lam prop (.free ⟨"x", 1⟩)
+
+#guard freeX1.reify Context.empty =
+  .lam ⟨⟨"x", 2⟩, prop⟩ (.var ⟨⟨"x", 1⟩, prop⟩)
+#guard interpretNamed (freeX1.reify Context.empty) Names.free = some ⟨_, freeX1⟩
+
+
+example {e f : Term s} (h : Equiv e f) (ρ : Context) :
+    AlphaBetaEta (e.reify ρ) (f.reify ρ) := h.reify ρ
+
+
+example (e : Term s) :
+    interpretNamed (e.reify Context.empty) Names.free = some ⟨s, e.subst Context.empty.toSub⟩ := interpretNamed_reify_free e Context.empty
+
+#print axioms interpretNamed_reify
+#print axioms Equiv.reify
 end Lisa.Tests.NamedIntegration

@@ -5,7 +5,7 @@ import Lisa.LambdaFol.ToPureFol.PureFolTranslationSubstitution
 /-! Individual substitution on complete source expressions commutes with the
 first-order reader. This includes substitution underneath epsilon binders. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 namespace FirstOrderCompatibleExpr
 
 def substIndividual (e : FirstOrderCompatibleExpr s) (x : Identifier) (a : FirstOrderCompatibleExpr ind) : FirstOrderCompatibleExpr s where

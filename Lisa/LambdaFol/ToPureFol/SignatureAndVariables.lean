@@ -1,41 +1,14 @@
-import Lisa.AlphaBetaEtaNormalization.Syntax
+import Lisa.LambdaFol.FirstOrder
+import Lisa.LambdaFol.Translation
+import Lisa.AlphaBetaEtaNormalization.Internal.Syntax
 import Lisa.LambdaFol.ToPureFol.SymbolSubstitution
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
+import Lisa.AlphaBetaEtaNormalization.Internal.NamedDecision
 import Mathlib.ModelTheory.Syntax
-
-namespace Lisa.LambdaFol.Signature
-/-- The type of an n-ary first-order symbol with result sort `b`. -/
-def arity : Nat → LSort → LSort
-  | 0, b => b
-  | n + 1, b => ind >> arity n b
-
-end Lisa.LambdaFol.Signature
 
 /-! First-order symbols, bound-variable correspondence, and curried application. -/
 namespace Lisa.LambdaFol
-open FirstOrder AlphaBetaEtaNormalization
+open FirstOrder AlphaBetaEtaNormalization.Algorithm
 namespace PureFolTranslation
-/-- Keep schematic symbols and constants in separate namespaces. -/
-structure Symbol where
-  schematic : Bool
-  id : Identifier
-  deriving DecidableEq
-
-def language : Language where
-  Functions _ := Symbol
-  Relations _ := Symbol
-
-/-- Translate individual de Bruijn indices to PureFol bound-variable levels.
-`none` means no corresponding PureFol variable is supplied. -/
-abbrev BoundVarMap (n : Nat) := Nat → Option (Fin n)
-/-- Under an individual binder, index zero denotes the newest target level. -/
-def bind (ρ : BoundVarMap n) : BoundVarMap (n + 1)
-  | 0 => some (Fin.last n)
-  | k + 1 => (ρ k).map Fin.castSucc
-
-def normalizeExpr? (e : Expr) : Option Packed.Expr :=
-  (interpretNamed e Names.free).map (fun ⟨s, t⟩ => ⟨s, normalize t⟩)
-
 /-- Only individual leaves change; the heads of first-order applications stay
 the same. Bound variables at other sorts remain bound variables. -/
 structure PreservesHeads (R : SymbolSubstitution) : Prop where

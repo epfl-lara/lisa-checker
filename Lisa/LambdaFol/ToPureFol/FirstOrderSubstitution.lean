@@ -1,12 +1,12 @@
 import Lisa.LambdaFol.ToPureFol.SymbolSubstitution
-import Lisa.AlphaBetaEtaNormalization.Reification
+import Lisa.AlphaBetaEtaNormalization.Internal.Reification
 import Lisa.LambdaFol.ToPureFol.NormalizationScope
 import Lisa.LambdaFol.ToPureFol.FirstOrderShape
 
 /-! Replacement depends only on the symbols occurring in an expression.
 For a complete expression it is independent of the ambient-index assignment. -/
 namespace Lisa.LambdaFol.SymbolSubstitution
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 theorem apply_congr (e : Term s) (R S : SymbolSubstitution)
     (hb : R.bound = S.bound) (hc : R.const = S.const)
@@ -93,7 +93,7 @@ theorem apply_equiv (e : Term s) (R S : SymbolSubstitution)
       · intro u n
         by_cases h : u = b
         · subst u; cases n with
-          | zero => simpa [lift] using AlphaBetaEtaNormalization.Equiv.refl (Term.bound (s := b) 0)
+          | zero => simpa [lift] using AlphaBetaEtaNormalization.Algorithm.Equiv.refl (Term.bound (s := b) 0)
           | succ n => simpa [lift] using (hb b n).rename (Ren.shift b)
         · simpa [lift, Sub.lift_other h] using (hb u n).rename (Ren.shift b)
       · intro u x; exact (hf u x).rename _
@@ -112,7 +112,7 @@ theorem single_equiv (e : Term s) (x : SVar) {a b : Term x.sort} (h : Equiv a b)
 end Lisa.LambdaFol.SymbolSubstitution
 
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 theorem Scoped.subst_eq {e : Term s} (h : Scoped d e) (σ : Sub)
     (hσ : ∀ u n, n < d u → σ u n = .bound n) : e.subst σ = e := by
@@ -141,7 +141,7 @@ end Lisa.LambdaFol
 This lets normalization and individual replacement commute without a semantic
 interpretation or an assumption about first-order provability. -/
 namespace Lisa.LambdaFol.FirstOrderShape
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 mutual
 theorem IsTermOrFunction.rename {e : Term s} (h : IsTermOrFunction e) (ρ : Ren) : IsTermOrFunction (e.rename ρ) := by

@@ -1,4 +1,4 @@
-import Lisa.Orthologic.Derivation
+import Lisa.Orthologic.Internal.Derivation
 import Lisa.LambdaFol.ToPureFol.PureFolToOrdered.NamedExpressions
 import Lisa.LambdaFol.PureFol
 
@@ -51,8 +51,8 @@ def epsilonExt {Γ Δ : Finset Expr} (x : SVar) (p q : Expr)
     simpa [SubstPair.pointwiseEq, SubstPair.sort,
       LSort.splitArgs, Expr.applied, a, b, hps, hx]
       using AlphaBetaEta.app (.app (.refl _) bp) bq
-  let z := AlphaBetaEtaNormalization.Context.empty.fresh e.freeVars (ind >> prop)
-  have hz : z ∉ e.freeVars := AlphaBetaEtaNormalization.Context.empty.fresh_not_mem e.freeVars (ind >> prop)
+  let z := AlphaBetaEtaNormalization.Algorithm.Context.empty.fresh e.freeVars (ind >> prop)
+  have hz : z ∉ e.freeVars := AlphaBetaEtaNormalization.Algorithm.Context.empty.fresh_not_mem e.freeVars (ind >> prop)
   let body := eq e (epsilon_ (.var z))
   have hbody : isFormula body := by
     apply isFormula_eq he
@@ -61,7 +61,7 @@ def epsilonExt {Γ Δ : Finset Expr} (x : SVar) (p q : Expr)
   have valid : r.valid := replacement_valid hbody ha params
   have cv (f : Expr) : AlphaBetaEta (substOne z f body) (eq e (epsilon_ f)) := by
     simpa [body, eq, epsilon_, substOne, Expr.subst, Subst.subst,
-      AlphaBetaEtaNormalization.NamedSubst.lookup_insert] using
+      AlphaBetaEtaNormalization.Algorithm.NamedSubst.lookup_insert] using
       AlphaBetaEta.app (.app (.refl _) (substOne_fresh he z f hz)) (.refl (epsilon_ f))
   have start : AlphaBetaEtaProof ∅ {r.source} := by
     exact convertTheorem (isFormula_eq he he) (cv a).symm (.rightRefl e he)

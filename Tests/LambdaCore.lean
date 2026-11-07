@@ -1,14 +1,14 @@
-import Lisa.AlphaBetaEtaNormalization.AlphaBetaEta
+import Lisa.AlphaBetaEtaNormalization.Internal.AlphaBetaEta
 
 /-! Keep capture-free syntax and conversion independent of named expressions and NbE. -/
 
 namespace Lisa.Tests.LambdaCore
 
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 run_cmd do
   let env ← Lean.getEnv
-  for name in [`Lisa.Expr, `Lisa.AlphaBetaEta, `Lisa.AlphaBetaEtaNormalization.eval] do
+  for name in [`Lisa.Expr, `Lisa.AlphaBetaEta, `Lisa.AlphaBetaEtaNormalization.Algorithm.eval] do
     if env.contains name then
       throwError "Intrinsic lambda core imports {name}"
 

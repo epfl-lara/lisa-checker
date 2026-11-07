@@ -154,8 +154,9 @@ This compares the entire sequent formula. It is different from matching the two 
 
 The finite-set encodings are `noncomputable` because they use `Finset.toList`.
 [Checker/Encoding.lean](Checker/Encoding.lean) defines `listSequentToFormula`
-on input lists and proves `listSequent_same`: for well-sorted inputs, the list
-and finite-set formulas are equivalent in `ProofRelation`. This is proved
+on input lists. [Internal/Encoding.lean](Checker/Internal/Encoding.lean) proves
+`listSequent_same`: for well-sorted inputs, the list and finite-set formulas
+are equivalent in `ProofRelation`. This is proved
 using logical rules, including permutation and duplicate removal.
 
 The generic proof systems still permit arbitrary expression relations.
@@ -296,7 +297,7 @@ Then `provable_iff_of_simulation` needs only reverse two-formula admissibility.
 
 For the checker's `ProofRelation`, `of_alphaBetaEta` embeds conversion and
 `admissible` supplies the reverse two-formula derivations. Both are proved in
-[Checker/ProofRelation.lean](Checker/ProofRelation.lean). This completes the
+[Checker/Internal/ProofRelation.lean](Checker/Internal/ProofRelation.lean). This completes the
 translation to the αβη baseline.
 
 ## 7. OrderedWeakened: expand flexible rules into explicit derivations
@@ -405,11 +406,11 @@ Read:
 2. [ImportedWeakened.lean](ImportedWeakened.lean)
 3. The [Orthologic pipeline and soundness proofs](Orthologic/README.md)
 4. [Checker/ProofRelation.lean](Checker/ProofRelation.lean)
-5. [Checker/Encoding.lean](Checker/Encoding.lean)
-6. [Checker/Interfaces.lean](Checker/Interfaces.lean)
-7. [Checker/Data.lean](Checker/Data.lean)
-8. [Checker/Check.lean](Checker/Check.lean)
-9. [Checker/Soundness.lean](Checker/Soundness.lean)
+5. [Checker/Data.lean](Checker/Data.lean)
+6. [Checker/ProofData.lean](Checker/ProofData.lean)
+7. [Checker/Check.lean](Checker/Check.lean)
+8. [Checker/Soundness.lean](Checker/Soundness.lean)
+9. The [executable support and certificate proofs](Checker/README.md#follow-the-execution)
 10. [Checker/Display.lean](Checker/Display.lean)
 11. [Checker/Binary.lean](Checker/Binary.lean)
 
@@ -564,9 +565,10 @@ A `Statement` preserves the order and repetitions in the input representation. I
 
 This avoids computing an arbitrary enumeration of a finite set.
 `Statement.same_formula` proves equivalence between the executable encoding and
-the abstract encoding for sorted inputs, using `Checker/Encoding.lean`.
+the abstract encoding for sorted inputs, in [Checker/Internal/Encoding.lean](Checker/Internal/Encoding.lean).
 
-`Statement.testLeq`, `testSame`, and `testTrue` produce positive tests for
+[StatementTests.lean](Checker/StatementTests.lean) defines `Statement.testLeq`,
+`testSame`, and `testTrue`, positive tests for
 whole-sequent implication, equivalence, and equivalence to truth. Only successes
 are transported into the proof system; failures carry no logical conclusion.
 
@@ -601,7 +603,9 @@ Keeping assumptions as `Statement`s allows executable comparisons during dischar
 
 ## 12. Checker: from linear records to certified derivations
 
-Source: [Checker/Check.lean](Checker/Check.lean).
+Sources: [ProofData.lean](Checker/ProofData.lean) defines the input records;
+[Algorithm.lean](Checker/Algorithm.lean) checks each step;
+[Check.lean](Checker/Check.lean) checks the complete proof.
 
 ### Input records are not proofs yet
 

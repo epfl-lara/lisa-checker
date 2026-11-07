@@ -1,6 +1,6 @@
+import Lisa.AlphaBetaEtaNormalization.Algorithm
 import Lisa.Orthologic.FromLambda
 import Lisa.Orthologic.Normalization
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
 
 /-! The public LambdaFOL pipeline: alpha-beta-eta canonicalization, extended OL
 normalization, then lattice comparison. No stage uses fuel. Soundness is proved
@@ -11,14 +11,14 @@ namespace Lisa.Orthologic
 
 /-- Elaborate once, canonicalize by alpha-beta-eta, then normalize by OL. -/
 def prepare (p : Expr) : Option SomeExpr :=
-  (AlphaBetaEtaNormalization.interpretNamed p AlphaBetaEtaNormalization.Names.free).map fun ⟨s, e⟩ =>
-    ⟨s, computeNormalForm (SimpleExpr.ofTerm (AlphaBetaEtaNormalization.normalize e))⟩
+  (AlphaBetaEtaNormalization.Algorithm.interpretNamed p AlphaBetaEtaNormalization.Algorithm.Names.free).map fun ⟨s, e⟩ =>
+    ⟨s, computeNormalForm (SimpleExpr.ofTerm (AlphaBetaEtaNormalization.Algorithm.normalize e))⟩
 
 /-- Reconstruct named output. `none` means the input is ill-sorted. The result
 is provably interchangeable with the input; its spelling is not a unique key
 for OL equivalence, which is tested by `isSame`. -/
 def normalize (p : Expr) : Option Expr :=
-  (prepare p).map fun ⟨_, e⟩ => e.reify AlphaBetaEtaNormalization.Context.empty
+  (prepare p).map fun ⟨_, e⟩ => e.reify AlphaBetaEtaNormalization.Algorithm.Context.empty
 
 /-- Compare normalized expressions, including commutativity. Ill-sorted inputs
 give `none`; different sorts give `some false`. A negative answer does not claim

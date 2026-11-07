@@ -6,7 +6,7 @@ import Lisa.LambdaFol.ToPureFol.PureFolSubstitution
 Freshness follows from the named-interpretation roundtrip. Binding and substitution
 commute with reification up to alpha-beta-eta equivalence. -/
 namespace Lisa.LambdaFol.PureFolEmbedding
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (BoundedTerm BoundedFormula)
 open PureFolTranslation (language)
 open Embedding (apps head mem_apps)

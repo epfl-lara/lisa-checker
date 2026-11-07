@@ -6,7 +6,7 @@ import Lisa.Ordered
 /-! Transport simultaneous source substitutions through arbitrary formula
 templates. For a repeated parameter, the last replacement wins. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 def ProvablyRelatedExpr (Γ Δ : Finset (PureFol.Formula PureFolTranslation.language)) (R : FirstOrderAssignment)
     (e f : Expr) : Prop :=
@@ -79,7 +79,7 @@ end Lisa.LambdaFol
 pointwise parameters may be assigned arbitrary scoped expressions, establishing
 relatedness of the compared functions before replacement in a formula template. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 private theorem app_sort {f a : Expr} (hf : f.hasSort (s >> t)) (ha : a.hasSort s) :
     (Expr.app f a).hasSort t := by

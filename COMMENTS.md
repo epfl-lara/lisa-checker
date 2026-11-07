@@ -8,22 +8,29 @@ Syntax.lean
 AlphaBetaEta.lean (on Lisa terms)
 
 ### AlphaBetaEtaNormalization package (on intrinsically typed terms)
-2. AlphaBetaEtaNormalization.Syntax
-3. AlphaBetaEtaNormalization.AlphaBetaEta
-4. AlphaBetaEtaNormalization.Semantics
-5. AlphaBetaEtaNormalization.Evaluation
-6. AlphaBetaEtaNormalization.Normalization
-7. AlphaBetaEtaNormalization.Decision
-8. AlphaBetaEtaNormalization.Substitution
-9. AlphaBetaEtaNormalization.Erasure
-10. AlphaBetaEtaNormalization.Elaboration
-11. AlphaBetaEtaNormalization.NamedEnvironment
-12. AlphaBetaEtaNormalization.NamedAlpha
-13. AlphaBetaEtaNormalization.NamedSubstitution
-14. AlphaBetaEtaNormalization.NamedAlphaBetaEta
-15. AlphaBetaEtaNormalization.Reification
-16. AlphaBetaEtaNormalization.NamedReflection
-17. AlphaBetaEtaNormalization.NamedDecision
+Public interface: [Canonicalization](Lisa/AlphaBetaEtaNormalization/Canonicalization.lean) and
+[Comparison](Lisa/AlphaBetaEtaNormalization/Comparison.lean).
+
+Executable definitions: [TypedSyntax](Lisa/AlphaBetaEtaNormalization/TypedSyntax.lean)
+and [Algorithm](Lisa/AlphaBetaEtaNormalization/Algorithm.lean).
+
+Proof reading order:
+
+2. AlphaBetaEtaNormalization.Internal.Syntax
+3. AlphaBetaEtaNormalization.Internal.AlphaBetaEta
+4. AlphaBetaEtaNormalization.Internal.Semantics
+5. AlphaBetaEtaNormalization.Internal.Evaluation
+6. AlphaBetaEtaNormalization.Internal.Normalization
+7. AlphaBetaEtaNormalization.Internal.Decision
+8. AlphaBetaEtaNormalization.Internal.Substitution
+10. AlphaBetaEtaNormalization.Internal.Elaboration
+11. AlphaBetaEtaNormalization.Internal.NamedEnvironment
+12. AlphaBetaEtaNormalization.Internal.NamedAlpha
+13. AlphaBetaEtaNormalization.Internal.NamedSubstitution
+14. AlphaBetaEtaNormalization.Internal.NamedAlphaBetaEta
+15. AlphaBetaEtaNormalization.Internal.Reification
+16. AlphaBetaEtaNormalization.Internal.NamedReflection
+17. AlphaBetaEtaNormalization.Internal.NamedDecision
 
 ### Expression orders and proof systems
 Order.lean
@@ -39,30 +46,36 @@ Imported.lean
 ImportedWeakened.lean
 
 ### The Orthologic Package
+Reader-facing interface: [Expression](Lisa/Orthologic/Expression.lean),
+[Equivalence](Lisa/Orthologic/Equivalence.lean),
+[Soundness](Lisa/Orthologic/Soundness.lean), and
+[Cached](Lisa/Orthologic/Cached.lean).
+
+Executable support in dependency order:
+
 Orthologic/Syntax.lean
-Orthologic/Comparison.lean
 Orthologic/StructuralOrder.lean
+Orthologic/Comparison.lean
 Orthologic/Normalization.lean
-Orthologic/Derivation.lean
-Orthologic/Congruence.lean
-Orthologic/Provability.lean
-Orthologic/ComparisonSoundness.lean
-Orthologic/NormalizationSoundness.lean
-Orthologic/Lowering.lean
-Orthologic/LoweringSoundness.lean
+Orthologic/FromLambda.lean
 Orthologic/Expression.lean
-Orthologic/ExpressionSoundness.lean
 Orthologic/CacheKey.lean
+Orthologic/Cache.lean
+Orthologic/CacheAlgorithm.lean
 Orthologic/Cached.lean
-Orthologic/CachedSoundness.lean
+
+Supporting proofs: [Internal reading order](Lisa/Orthologic/Internal/README.md#reading-order).
 
 ### Imported proofs and the checker
 Checker/ProofRelation.lean
-Checker/Encoding.lean
-Checker/Interfaces.lean
 Checker/Data.lean
+Checker/ProofData.lean
 Checker/Check.lean
 Checker/Soundness.lean
+Checker/Encoding.lean
+Checker/Interfaces.lean
+Checker/StatementTests.lean
+Checker/Algorithm.lean
 Checker/Display.lean
 Checker/Binary.lean
 CLI.lean
@@ -84,13 +97,13 @@ normalizeNamed : Lisa.Expr → Option Lisa.Expr
 
 ### AlphaBetaEtaNormalization
 [`Term`](Lisa/AlphaBetaEta.lean#L77) is a the type of lambda expr modulo conversion. But [`isTerm`](Lisa/Syntax.lean#L64) is a predicate on the type of lambda expr true for expressions of type `Ind`.
-[`Term`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L13) is a type of lambda expr in de Bruijn form.
+[`Term`](Lisa/AlphaBetaEtaNormalization/Internal/Syntax.lean#L13) is a type of lambda expr in de Bruijn form.
 
 The first isn't a great name.
 
-[`Ren`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L20) is not bijective in general so that's strange to me. Apparently it's not unheared of terminology in lambda calculus literature.
+[`Ren`](Lisa/AlphaBetaEtaNormalization/Internal/Syntax.lean#L20) is not bijective in general so that's strange to me. Apparently it's not unheared of terminology in lambda calculus literature.
 
-[`ground`](Lisa/AlphaBetaEtaNormalization/Semantics.lean#L18) If I understand correctly this is supposed to only take as arguments (in practice) Ind and Prop and not >>, and "ground sort" means either Ind or Prop. "ground" is confusing terminology as sorts don't contain variables, and it's weird that it can take arguments that it shouldn't.
+[`ground`](Lisa/AlphaBetaEtaNormalization/Internal/Semantics.lean#L18) If I understand correctly this is supposed to only take as arguments (in practice) Ind and Prop and not >>, and "ground sort" means either Ind or Prop. "ground" is confusing terminology as sorts don't contain variables, and it's weird that it can take arguments that it shouldn't.
 
 Why have explicit contexts mapping variables instead of annotated variables? That would have entirely avoided all dependencies on Gamma everywhere?
 
@@ -98,7 +111,7 @@ Normalization by Evaluation is complicated enough (to me) but it seems it is qui
 
 Also, why don't we track type intrinsically in Lisa's expressions, as we do in the actual Lisa checker? This would avoid the Elaboration machinery and make types available all the time, and guaranteed well-constructed?
 
-I understand there are two routes to transport [`Expr`](Lisa/Syntax.lean#L7) to [`Term`](Lisa/AlphaBetaEtaNormalization/Syntax.lean#L13):
+I understand there are two routes to transport [`Expr`](Lisa/Syntax.lean#L7) to [`Term`](Lisa/AlphaBetaEtaNormalization/Internal/Syntax.lean#L13):
 - `interpretNamed e (Names.free : Names [])`
 - `elaborate [] (e.toNameless [])`
 They are proven equivalent in NamedAlpha. Are they both necessary? Could we drop one?

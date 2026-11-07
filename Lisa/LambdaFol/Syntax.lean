@@ -1,4 +1,4 @@
-import Lisa.AlphaBetaEtaNormalization.NamedDecision
+import Lisa.AlphaBetaEtaNormalization
 import Lisa.Sorting
 import Lisa.Ordered
 

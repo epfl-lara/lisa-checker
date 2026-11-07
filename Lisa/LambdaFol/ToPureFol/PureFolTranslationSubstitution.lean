@@ -6,7 +6,7 @@ The mutual reader induction covers formulas inside epsilon terms. It states
 preservation of successful reads; unsupported source syntax is not required
 to remain unsupported after a replacement. -/
 namespace Lisa.LambdaFol.PureFolTranslation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (BoundedTerm.subst BoundedFormula.subst Substitution)
 
 private theorem func_subst (σ : Substitution PureFolTranslation.language Identifier n Identifier m)
@@ -212,7 +212,7 @@ end Lisa.LambdaFol.PureFolTranslation
 /-! Translation to PureFol commutes with abstraction of a free individual name and substitution
 of an individual term. Both operations preserve inner quantifier and epsilon binders. -/
 namespace Lisa.LambdaFol.PureFolTranslation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (Renaming)
 
 def closeAt (x : Identifier) (n : Nat) : Renaming Identifier n Identifier (1 + n)

@@ -5,7 +5,7 @@ import Lisa.LambdaFol.EliminateInstantiation.Instantiation
 then translate the result to PureFol. These operations preserve sorts and respect
 αβη equivalence and simultaneous schematic instantiation. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 namespace FirstOrderAssignment
 
@@ -13,7 +13,7 @@ noncomputable def applyExpr (R : FirstOrderAssignment) (e : Expr) (h : e.hasSort
   R.apply (Classical.choose (interpretNamed_sorted h Names.free))
 
 theorem applyExpr_of_named (R : FirstOrderAssignment) (e : Expr) (h : e.hasSort s)
-    {t : AlphaBetaEtaNormalization.Term s} (ht : interpretNamed e Names.free = some ⟨s, t⟩) :
+    {t : AlphaBetaEtaNormalization.Algorithm.Term s} (ht : interpretNamed e Names.free = some ⟨s, t⟩) :
     R.applyExpr e h = R.apply t := by
   have hh := Classical.choose_spec (interpretNamed_sorted h Names.free)
   have he : t = Classical.choose (interpretNamed_sorted h Names.free) := by
@@ -90,7 +90,7 @@ end Lisa.LambdaFol
 /-! Named abstraction and schematic instantiation commute with the syntactic
 assignment. Replacement images are complete expressions and remain simultaneous. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 namespace SymbolSubstitution
 
@@ -149,29 +149,29 @@ theorem applyExpr_lam_apply (R : FirstOrderAssignment) (x : SVar) (e : Expr) (he
   obtain ⟨u, hu⟩ := interpretNamed_sorted he Names.free
   rw [R.applyExpr_of_named (.lam x e) _ (t := .lam x.sort t)
     (by simp [interpretNamed, ht, Packed.lam]), (R.update x a).applyExpr_of_named e he hu]
-  apply AlphaBetaEtaNormalization.Equiv.trans (AlphaBetaEtaNormalization.Equiv.beta _ a.term)
+  apply AlphaBetaEtaNormalization.Algorithm.Equiv.trans (AlphaBetaEtaNormalization.Algorithm.Equiv.beta _ a.term)
   have h := SymbolSubstitution.interpretNamed_congr e
-    ((SymbolSubstitution.ofSub (AlphaBetaEtaNormalization.Term.single a.term)).comp (R.replacement.lift x.sort))
+    ((SymbolSubstitution.ofSub (AlphaBetaEtaNormalization.Algorithm.Term.single a.term)).comp (R.replacement.lift x.sort))
     (R.update x a).replacement (Names.free.bind x) Names.free (by
       funext s c
       simpa only [SymbolSubstitution.comp, SymbolSubstitution.lift, SymbolSubstitution.apply_ofSub, replacement,
-        update, AlphaBetaEtaNormalization.Term.instantiate] using (R.const s c).term.shift_instantiate a.term) (by
+        update, AlphaBetaEtaNormalization.Algorithm.Term.instantiate] using (R.const s c).term.shift_instantiate a.term) (by
         intro y _
         by_cases hy : y = x
         · subst y
           simp [SymbolSubstitution.comp, SymbolSubstitution.apply_ofSub, SymbolSubstitution.apply,
-            SymbolSubstitution.lift, AlphaBetaEtaNormalization.Term.single, AlphaBetaEtaNormalization.Term.subst, Names.free, replacement]
-        · simp only [Names.bind_other _ hy, Names.free, AlphaBetaEtaNormalization.Term.rename, SymbolSubstitution.apply,
+            SymbolSubstitution.lift, AlphaBetaEtaNormalization.Algorithm.Term.single, AlphaBetaEtaNormalization.Algorithm.Term.subst, Names.free, replacement]
+        · simp only [Names.bind_other _ hy, Names.free, AlphaBetaEtaNormalization.Algorithm.Term.rename, SymbolSubstitution.apply,
             SymbolSubstitution.comp, SymbolSubstitution.lift, SymbolSubstitution.apply_ofSub, replacement]
           change ((R.free y.sort y.id).term.shift x.sort).instantiate a.term = _
-          rw [AlphaBetaEtaNormalization.Term.shift_instantiate]
+          rw [AlphaBetaEtaNormalization.Algorithm.Term.shift_instantiate]
           exact congrArg FirstOrderCompatibleExpr.term (R.update_other x a hy).symm)
   rw [ht, hu] at h
   have hh : ((R.replacement.lift x.sort).apply t).instantiate a.term =
       (R.update x a).replacement.apply u := by
     simpa only [Option.map_some, SymbolSubstitution.packed, Option.some.injEq, Sigma.mk.inj_iff,
       heq_eq_eq, true_and, ← SymbolSubstitution.apply_apply, SymbolSubstitution.apply_ofSub,
-      AlphaBetaEtaNormalization.Term.instantiate] using h
+      AlphaBetaEtaNormalization.Algorithm.Term.instantiate] using h
   rw [hh]
   exact .refl _
 
@@ -182,7 +182,7 @@ end Lisa.LambdaFol
 Ill-sorted inputs have a harmless default; every derivation uses the sorted
 equations below. No restriction is imposed on intermediate higher-order syntax. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 namespace FirstOrderAssignment
 
 variable {R : FirstOrderAssignment}
@@ -292,7 +292,7 @@ end Lisa.LambdaFol
 Fresh target names are chosen only for reconstruction, independently of the
 names occurring in the source proof. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 namespace FirstOrderAssignment
 variable {R : FirstOrderAssignment}

@@ -2,7 +2,7 @@ import Lisa.LambdaFol.EliminateInstantiation.Instantiation
 import Lisa.LambdaFol.ToPureFol.SymbolSubstitution
 /-! Composition of schematic instantiations and its action on expressions. -/
 namespace Lisa.LambdaFol.Instantiation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 private def composeSubst (σ : Instantiation) : Lisa.Subst → Lisa.Subst
   | .nil => σ.substitution

@@ -3,7 +3,7 @@ import Lisa.LambdaFol.EliminateInstantiation.InstantiateTemplate
 a schematic substitution. The source and target remain α-equivalent to the
 substituted original formulas. -/
 namespace Lisa.LambdaFol.Instantiation
-open Expr AlphaBetaEtaNormalization
+open Expr AlphaBetaEtaNormalization.Algorithm
 
 def mapTemplate (σ : Instantiation) (ρ : SVar → SVar) (hs : ∀ x, (ρ x).sort = x.sort)
     (ctx : SubstContext) : SubstContext where

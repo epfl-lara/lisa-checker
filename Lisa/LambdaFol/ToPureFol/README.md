@@ -49,8 +49,9 @@ normalizer.
 [NormalizationScope.lean](NormalizationScope.lean) proves the additional scope and
 free-variable facts needed here.
 
-Then [PureFolTranslation.lean](PureFolTranslation.lean) writes that normal form using PureFol's own
-term and formula constructors. This step is needed because PureFol is an
+Then [Translation.lean](../Translation.lean) writes that normal form using PureFol's own
+term and formula constructors. [PureFolTranslation.lean](PureFolTranslation.lean)
+proves that this operation succeeds on first-order normal forms. This step is needed because PureFol is an
 independent syntax. The reading operation is partial on arbitrary inputs,
 but its success is proved for the expressions admitted by the translation.
 
@@ -124,7 +125,8 @@ PureFol → Ordered → LambdaFol → WithoutInstantiation.
 | If you want to check… | Read… |
 | --- | --- |
 | Shared equivalence classes, formula-set conversion, and freshness | [FormulaClasses.lean](FormulaClasses.lean) |
-| The admitted first-order signature and bound-variable correspondence | [SignatureAndVariables.lean](SignatureAndVariables.lean) |
+| The admitted first-order signature and translation | [FirstOrder.lean](../FirstOrder.lean), [Translation.lean](../Translation.lean) |
+| Bound-variable correspondence lemmas | [SignatureAndVariables.lean](SignatureAndVariables.lean) |
 | Capture-avoiding replacement on typed lambda expressions | [SymbolSubstitution.lean](SymbolSubstitution.lean) |
 | Replacement's interaction with normalization and first-order shape | [FirstOrderSubstitution.lean](FirstOrderSubstitution.lean) |
 | Reading commutes with individual substitution and binding | [PureFolTranslationSubstitution.lean](PureFolTranslationSubstitution.lean) |

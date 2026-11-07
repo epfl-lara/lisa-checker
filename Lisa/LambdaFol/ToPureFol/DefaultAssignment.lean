@@ -4,7 +4,7 @@ import Lisa.LambdaFol.ToPureFol.Binders
 and logical constants. The assignment is the identity on complete expressions
 already using that signature and only free individual and proposition variables. -/
 namespace Lisa.LambdaFol
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 namespace FirstOrderCompatibleExpr
 
@@ -17,7 +17,7 @@ def constantFunction (b : LSort) (e : FirstOrderCompatibleExpr s) : FirstOrderCo
 theorem constantFunction_apply (b : LSort) (e : FirstOrderCompatibleExpr s) (a : FirstOrderCompatibleExpr b) :
     Equiv ((constantFunction b e).app a).term e.term := by
   simpa only [constantFunction, app, Term.instantiate, e.subst_eq] using
-    (AlphaBetaEtaNormalization.Equiv.beta e.term a.term)
+    (AlphaBetaEtaNormalization.Algorithm.Equiv.beta e.term a.term)
 
 /-- A closed expression of every simple sort: `εx. ⊤` at individual sort, `⊤`
 at proposition sort, and constant functions at arrow sorts. -/

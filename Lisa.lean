@@ -7,7 +7,6 @@ import Lisa.AlphaBetaEtaOrder
 import Lisa.Weakened
 import Lisa.OrderedWeakened
 import Lisa.OrderedComparison
-import Lisa.Orthologic.ExpressionSoundness
-import Lisa.Orthologic.CachedSoundness
+import Lisa.Orthologic
 import Lisa.Checker
 import Lisa.LambdaFol

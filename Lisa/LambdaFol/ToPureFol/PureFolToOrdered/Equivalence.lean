@@ -6,7 +6,7 @@ import Lisa.LambdaFol.ToPureFol.FirstOrderConclusions
 recovers its αβη class. `OrderedAlphaBetaEta.ofPureFol` uses this fact to recover
 the original conclusion from an embedded PureFol proof. -/
 namespace Lisa.LambdaFol.PureFolTranslation
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open FirstOrderShape (AllowedConstants)
 
 /-- Canonical translation to PureFol reconstructs the source expression with the same free names. -/

@@ -5,14 +5,14 @@ import Lisa.LambdaFol.ToPureFol.SignatureAndVariables
 intrinsically sorted lambda terms. All target binders bind individuals.
 The variable environment makes binding and renaming explicit and uniform. -/
 namespace Lisa.LambdaFol.PureFolEmbedding
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (BoundedTerm BoundedFormula Renaming)
 open PureFolTranslation (language)
 open Embedding (apps head)
 open Signature (arity)
 variable {α β : Type}
 
-abbrev VariableAssignment (α : Type) (n : Nat) := α ⊕ Fin n → AlphaBetaEtaNormalization.Term ind
+abbrev VariableAssignment (α : Type) (n : Nat) := α ⊕ Fin n → AlphaBetaEtaNormalization.Algorithm.Term ind
 
 def lift (v : VariableAssignment α n) : VariableAssignment α (n + 1)
   | .inl x => (v (.inl x)).shift ind
@@ -38,11 +38,11 @@ theorem lift_precompose (v : VariableAssignment β m) (ρ : Renaming α n β m) 
       refine Fin.lastCases ?_ (fun j => ?_) i <;> simp [Function.comp_def, lift_shift]
 
 mutual
-  def term {n : Nat} (v : VariableAssignment α n) : BoundedTerm language α n → AlphaBetaEtaNormalization.Term ind
+  def term {n : Nat} (v : VariableAssignment α n) : BoundedTerm language α n → AlphaBetaEtaNormalization.Algorithm.Term ind
     | .var x => v x
     | .func (k := k) c ts => apps k (.const c.id) (fun i => term v (ts i))
     | .epsilon p => .app (.const ⟨"epsilon", 0⟩) (.lam ind (formula (lift v) p))
-  def formula {n : Nat} (v : VariableAssignment α n) : BoundedFormula language α n → AlphaBetaEtaNormalization.Term prop
+  def formula {n : Nat} (v : VariableAssignment α n) : BoundedFormula language α n → AlphaBetaEtaNormalization.Algorithm.Term prop
     | .rel (k := k) c ts => apps k (head c (arity k prop)) (fun i => term v (ts i))
     | .equal t u => .app (.app (.const ⟨"eq", 0⟩) (term v t)) (term v u)
     | .top => .const ⟨"top", 0⟩
@@ -103,10 +103,10 @@ theorem environment_lift (n : Nat) :
         omega
 
 /-- Embed a PureFol term with no ambient bound slots; free identifiers are retained. -/
-def toLambdaTerm (t : PureFol.Term language) : AlphaBetaEtaNormalization.Term ind :=
+def toLambdaTerm (t : PureFol.Term language) : AlphaBetaEtaNormalization.Algorithm.Term ind :=
   term (environment 0) t
 /-- Embed a PureFol formula with no ambient bound slots. -/
-def toLambdaFormula (p : PureFol.Formula language) : AlphaBetaEtaNormalization.Term prop :=
+def toLambdaFormula (p : PureFol.Formula language) : AlphaBetaEtaNormalization.Algorithm.Term prop :=
   formula (environment 0) p
 
 end Lisa.LambdaFol.PureFolEmbedding
@@ -114,7 +114,7 @@ end Lisa.LambdaFol.PureFolEmbedding
 /-! Renaming and simultaneous substitution commute with the independent embedding,
 including quantifier and epsilon bodies. -/
 namespace Lisa.LambdaFol.PureFolEmbedding
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (BoundedTerm BoundedFormula Renaming Substitution)
 open PureFolTranslation (language)
 open Embedding (apps head apps_replace)
@@ -246,7 +246,7 @@ end Lisa.LambdaFol.PureFolEmbedding
 /-! Individual replacement and binding commute with the embedding. Constants
 remain constants; only free individual variables are substituted. -/
 namespace Lisa.LambdaFol.PureFolEmbedding
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 open PureFol (BoundedTerm BoundedFormula)
 open PureFolTranslation (language)
 open Embedding (apps head apps_replace)

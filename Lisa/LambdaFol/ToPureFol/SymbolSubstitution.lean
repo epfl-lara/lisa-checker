@@ -1,5 +1,5 @@
-import Lisa.AlphaBetaEtaNormalization.AlphaBetaEta
-import Lisa.AlphaBetaEtaNormalization.NamedEnvironment
+import Lisa.AlphaBetaEtaNormalization.Internal.AlphaBetaEta
+import Lisa.AlphaBetaEtaNormalization.Internal.NamedEnvironment
 
 /-!
 # Capture-avoiding replacement in intrinsically sorted expressions
@@ -13,7 +13,7 @@ keep the binder and substitution proofs independent of the normalizer.
 
 namespace Lisa.LambdaFol
 
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 @[ext] structure SymbolSubstitution where
   bound : Sub
@@ -169,7 +169,7 @@ end Lisa.LambdaFol
 
 namespace Lisa.LambdaFol.SymbolSubstitution
 
-open AlphaBetaEtaNormalization
+open AlphaBetaEtaNormalization.Algorithm
 
 def packed (R : SymbolSubstitution) : Packed.Expr → Packed.Expr
   | ⟨s, e⟩ => ⟨s, R.apply e⟩
